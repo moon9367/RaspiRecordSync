@@ -14,12 +14,43 @@ log_file = "record_log.csv"   # 로그 파일명
 
 def get_cpu_info():
     try:
-        # CPU 사용률 초기화 (첫 번째 호출은 0을 반환하므로)
-        psutil.cpu_percent(interval=0)
-        time.sleep(0.1)  # 짧은 대기
-        
-        # CPU 사용률을 정확히 측정하기 위해 1초 대기
+        # CPU 사용률을 여러 방법으로 측정
+        # 방법 1: psutil 사용
         cpu_percent = psutil.cpu_percent(interval=1)
+        
+        # 방법 2: /proc/loadavg 사용 (백업)
+        if cpu_percent == 0.0:
+            try:
+                with open('/proc/loadavg', 'r') as f:
+                    load_avg = f.read().strip().split()
+                    # 1분 평균 로드 * 100 / CPU 코어 수로 근사치 계산
+                    cpu_cores = psutil.cpu_count()
+                    load_1min = float(load_avg[0])
+                    cpu_percent = min(100.0, (load_1min / cpu_cores) * 100)
+            except:
+                cpu_percent = 0.0
+        
+        # 방법 3: top 명령어 사용 (최후의 수단)
+        if cpu_percent == 0.0:
+            try:
+                top_cmd = ["top", "-bn1", "-p", "1"]
+                top_result = subprocess.run(top_cmd, capture_output=True, text=True)
+                if top_result.returncode == 0:
+                    lines = top_result.stdout.split('\n')
+                    for line in lines:
+                        if 'Cpu(s):' in line:
+                            parts = line.split()
+                            for i, part in enumerate(parts):
+                                if part == 'Cpu(s):':
+                                    if i + 1 < len(parts):
+                                        cpu_str = parts[i + 1].replace('%us,', '').replace('%sy,', '').replace('%ni,', '').replace('%id,', '')
+                                        try:
+                                            cpu_percent = 100.0 - float(cpu_str)
+                                            break
+                                        except:
+                                            pass
+            except:
+                cpu_percent = 0.0
         
         # 온도 측정
         temp_cmd = ["vcgencmd", "measure_temp"]
