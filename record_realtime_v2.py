@@ -9,7 +9,6 @@ import csv
 
 # 사용자 설정
 video_duration_ms = 10000     # 촬영 시간 (밀리초) - 10초씩 끊어서 저장
-cam_number = 1  # CAM 번호 설정 (필요시 수정)
 output_dir = "recordings"     # 저장 디렉토리
 log_file = "record_log.csv"   # 로그 파일명
 
@@ -75,7 +74,7 @@ def signal_handler(sig, frame):
 
 def main():
     print("🎬 RaspiRecordSync - 영상 저장 및 CSV 로그 기록")
-    print(f"📹 CAM{cam_number} | 촬영 시간: {video_duration_ms//1000}초씩 연속 저장")
+    print(f"촬영 시간: {video_duration_ms//1000}초씩 연속 저장")
     print(f"📁 저장 위치: {output_dir}")
     print(f"📝 로그 파일: {log_file}")
     signal.signal(signal.SIGINT, signal_handler)
