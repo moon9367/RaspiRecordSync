@@ -8,7 +8,7 @@ import psutil
 # 사용자 설정
 upload_interval_seconds = 60  # 1분마다 저장 (테스트용)
 video_duration_ms = 60000     # 60초 촬영 (rpicam-vid 기준)
-cam_number = 1  # CAM 번호 설정 (필요시 수정)
+cam_number = 1  # CAM 번호 설정 (필요시 수정)테스트
 nas_ip = "tspol.iptime.org"
 nas_port = 8888
 upload_path = "/cam/upload.php"
