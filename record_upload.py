@@ -41,29 +41,15 @@ def get_cpu_info():
         print(f"CPU 정보 가져오기 실패: {e}")
         return 0.0, 0.0
 
-def create_overlay_text():
-    """오버레이 텍스트 파일을 생성합니다."""
-    current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    cpu_percent, cpu_temp = get_cpu_info()
-    
-    # CAM 정보와 날짜시간 (좌측 상단)
-    cam_time_info = f"CAM{cam_number} {current_time}"
-    # CPU 정보 (우측 상단)
-    cpu_info = f"CPU: {cpu_percent:.1f}% | {cpu_temp:.1f}°C"
-    
-    # 오버레이 텍스트 파일 생성
-    overlay_content = f"{cam_time_info}\n{cpu_info}"
-    with open("overlay.txt", "w") as f:
-        f.write(overlay_content)
-    
-    return cam_time_info, cpu_info
-
 def record_video(h264_file):
     print(f"▶ 촬영 시작: {h264_file}")
     
-    # 촬영 시작 전 오버레이 텍스트 생성
-    cam_info, cpu_info = create_overlay_text()
-    print(f"📝 오버레이: {cam_info} | {cpu_info}")
+    # 촬영 시작 전 정보 출력
+    current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    cpu_percent, cpu_temp = get_cpu_info()
+    cam_info = f"CAM{cam_number} {current_time}"
+    cpu_info = f"CPU: {cpu_percent:.1f}% | {cpu_temp:.1f}°C"
+    print(f"📝 촬영 정보: {cam_info} | {cpu_info}")
     
     record_cmd = [
         "rpicam-vid",
@@ -75,25 +61,50 @@ def record_video(h264_file):
         "--autofocus-mode", "auto",
         "--autofocus-speed", "normal",
         "--autofocus-range", "normal",
-        "--vflip",  # 상하 반전
-        "--overlay", "overlay.txt"  # 실시간 오버레이 추가
+        "--vflip"  # 상하 반전
     ]
     result = subprocess.run(record_cmd)
     return result.returncode == 0
 
 def convert_to_mp4(h264_file, mp4_file):
     print("🔄 mp4 변환 중...")
-    # 실시간 오버레이가 이미 적용되었으므로 단순 변환만 수행
+    
+    # 현재 날짜시간과 CPU 정보 가져오기
+    current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    cpu_percent, cpu_temp = get_cpu_info()
+    
+    # CAM 정보와 날짜시간 (좌측 상단)
+    cam_time_info = f"CAM{cam_number} {current_time}"
+    # CPU 정보 (우측 상단)
+    cpu_info = f"CPU: {cpu_percent:.1f}% | {cpu_temp:.1f}°C"
+    
+    # 텍스트 파일 생성
+    cam_text_file = "cam_text.txt"
+    cpu_text_file = "cpu_text.txt"
+    
+    with open(cam_text_file, 'w') as f:
+        f.write(cam_time_info)
+    with open(cpu_text_file, 'w') as f:
+        f.write(cpu_info)
+    
+    # 복합 필터: CAM+날짜시간(좌측 상단) + CPU 정보(우측 상단)
+    filter_complex = (
+        f"drawtext=textfile={cam_text_file}:fontcolor=white:fontsize=24:box=1:boxcolor=black@0.5:boxborderw=5:x=10:y=10,"
+        f"drawtext=textfile={cpu_text_file}:fontcolor=white:fontsize=16:box=1:boxcolor=black@0.5:boxborderw=3:x=w-tw-10:y=10"
+    )
+    
     convert_cmd = [
         "ffmpeg", "-fflags", "+genpts",
         "-r", "30", "-i", h264_file,
-        "-c:v", "copy", mp4_file
+        "-vf", filter_complex,
+        "-c:v", "libx264", "-preset", "fast", "-crf", "23", mp4_file
     ]
     result = subprocess.run(convert_cmd)
     
-    # 오버레이 파일 정리
+    # 임시 텍스트 파일 삭제
     try:
-        os.remove("overlay.txt")
+        os.remove(cam_text_file)
+        os.remove(cpu_text_file)
     except:
         pass
     
