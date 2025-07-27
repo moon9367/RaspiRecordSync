@@ -23,8 +23,8 @@ stop_upload_thread = False
 def get_cpu_info():
     """CPU 사용률과 온도 정보를 가져옵니다."""
     try:
-        # CPU 사용률 가져오기
-        cpu_percent = psutil.cpu_percent(interval=1)
+        # CPU 사용률 가져오기 (interval=0으로 즉시 반환)
+        cpu_percent = psutil.cpu_percent(interval=0)
         
         # CPU 온도 가져오기 (Raspberry Pi)
         temp_cmd = ["vcgencmd", "measure_temp"]
@@ -34,7 +34,13 @@ def get_cpu_info():
             temp_value = temp_str.replace("temp=", "").replace("'C", "")
             cpu_temp = float(temp_value)
         else:
-            cpu_temp = 0.0
+            # 대체 방법으로 온도 확인
+            try:
+                with open('/sys/class/thermal/thermal_zone0/temp', 'r') as f:
+                    temp_raw = f.read().strip()
+                    cpu_temp = float(temp_raw) / 1000.0
+            except:
+                cpu_temp = 0.0
             
         return cpu_percent, cpu_temp
     except Exception as e:
@@ -180,6 +186,24 @@ def stop_upload_worker():
         upload_thread.join(timeout=5)
         print("📤 전송 워커 스레드 중지됨")
 
+def process_video(h264_file, mp4_file):
+    """비디오 변환 및 전송을 처리하는 함수"""
+    try:
+        if convert_to_mp4(h264_file, mp4_file):
+            os.remove(h264_file)
+            print(f"🧹 중간파일 삭제: {h264_file}")
+            
+            # 전송 큐에 추가 (비동기 전송)
+            upload_queue.put(mp4_file)
+            print(f"📤 전송 큐에 추가: {mp4_file}")
+            return True
+        else:
+            print("❌ 변환 실패")
+            return False
+    except Exception as e:
+        print(f"❌ 비디오 처리 오류: {e}")
+        return False
+
 def main():
     print("🎬 RaspiRecordSync 시작")
     print(f"📹 CAM{cam_number} | 촬영 간격: {upload_interval_seconds}초 | 촬영 시간: {video_duration_ms//1000}초")
@@ -199,17 +223,15 @@ def main():
             if record_video(h264_file):
                 print("✅ 촬영 완료")
                 
-                # 2. 변환
-                if convert_to_mp4(h264_file, mp4_file):
-                    os.remove(h264_file)
-                    print(f"🧹 중간파일 삭제: {h264_file}")
-                    
-                    # 3. 전송 큐에 추가 (비동기 전송)
-                    upload_queue.put(mp4_file)
-                    print(f"📤 전송 큐에 추가: {mp4_file}")
-                    
-                else:
-                    print("❌ 변환 실패")
+                # 2. 변환 및 전송을 별도 스레드에서 처리 (비동기)
+                process_thread = threading.Thread(
+                    target=process_video, 
+                    args=(h264_file, mp4_file),
+                    daemon=True
+                )
+                process_thread.start()
+                print("🔄 비디오 처리 스레드 시작됨")
+                
             else:
                 print("❌ 촬영 실패")
 
