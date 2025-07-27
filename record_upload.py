@@ -63,11 +63,19 @@ def convert_to_mp4(h264_file, mp4_file):
     cpu_percent, cpu_temp = get_cpu_info()
     cpu_info = f"CPU: {cpu_percent:.1f}% | {cpu_temp:.1f}°C"
     
+    # 텍스트 파일 생성
+    cam_text_file = "cam_text.txt"
+    cpu_text_file = "cpu_text.txt"
+    
+    with open(cam_text_file, 'w') as f:
+        f.write(cam_time_info)
+    with open(cpu_text_file, 'w') as f:
+        f.write(cpu_info)
+    
     # 복합 필터: CAM+날짜시간(좌측 상단) + CPU 정보(우측 상단)
-    # 텍스트를 따옴표로 감싸서 처리
     filter_complex = (
-        f"drawtext=text='{cam_time_info}':fontcolor=white:fontsize=24:box=1:boxcolor=black@0.5:boxborderw=5:x=10:y=10,"
-        f"drawtext=text='{cpu_info}':fontcolor=white:fontsize=16:box=1:boxcolor=black@0.5:boxborderw=3:x=w-tw-10:y=10"
+        f"drawtext=textfile={cam_text_file}:fontcolor=white:fontsize=24:box=1:boxcolor=black@0.5:boxborderw=5:x=10:y=10,"
+        f"drawtext=textfile={cpu_text_file}:fontcolor=white:fontsize=16:box=1:boxcolor=black@0.5:boxborderw=3:x=w-tw-10:y=10"
     )
     
     convert_cmd = [
@@ -77,6 +85,14 @@ def convert_to_mp4(h264_file, mp4_file):
         "-c:v", "libx264", "-preset", "fast", "-crf", "23", mp4_file
     ]
     result = subprocess.run(convert_cmd)
+    
+    # 임시 텍스트 파일 삭제
+    try:
+        os.remove(cam_text_file)
+        os.remove(cpu_text_file)
+    except:
+        pass
+    
     return result.returncode == 0
 
 def upload_to_nas(mp4_file):
