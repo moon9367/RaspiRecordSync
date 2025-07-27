@@ -73,28 +73,95 @@ def update_overlay_text():
             print(f"오버레이 텍스트 업데이트 오류: {e}")
             time.sleep(1)
 
-def record_video_with_realtime_overlay(h264_file):
+def record_video_with_realtime_overlay(output_file):
     """실시간 오버레이와 함께 영상을 촬영합니다."""
-    print(f"▶ 실시간 촬영 시작: {h264_file}")
+    print(f"▶ 실시간 촬영 시작: {output_file}")
     
-    # rpicam-vid로 촬영 (실시간 오버레이는 별도 처리)
-    record_cmd = [
-        "rpicam-vid",
-        "-t", str(video_duration_ms),
-        "-o", h264_file,
-        "--width", "1920",
-        "--height", "1080",
-        "--framerate", "30",
-        "--autofocus-mode", "auto",
-        "--autofocus-speed", "normal",
-        "--autofocus-range", "normal",
-        "--vflip"  # 상하 반전
-    ]
+    # 임시 H.264 파일명
+    temp_h264 = output_file.replace('.h264', '_temp.h264')
     
-    print(f"📝 실시간 CPU 모니터링 중...")
-    
-    result = subprocess.run(record_cmd, capture_output=True, text=True)
-    return result.returncode == 0
+    try:
+        # 1단계: rpicam-vid로 촬영
+        print("📹 1단계: 카메라 촬영")
+        record_cmd = [
+            "rpicam-vid",
+            "-t", str(video_duration_ms),
+            "--codec", "h264",
+            "--output", temp_h264,
+            "--width", "1920",
+            "--height", "1080",
+            "--framerate", "30",
+            "--autofocus-mode", "auto",
+            "--autofocus-speed", "normal",
+            "--autofocus-range", "normal",
+            "--vflip"  # 상하 반전
+        ]
+        
+        record_result = subprocess.run(record_cmd, capture_output=True, text=True)
+        
+        if record_result.returncode != 0:
+            print("❌ 촬영 실패")
+            return False
+        
+        # 2단계: 실시간 CPU 정보로 오버레이 추가
+        print("🎨 2단계: 실시간 오버레이 추가")
+        
+        # 현재 시간과 CPU 정보 가져오기 (촬영 완료 시점)
+        current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cpu_percent, cpu_temp = get_cpu_info()
+        
+        # CAM 정보와 날짜시간 (좌측 상단)
+        cam_time_text = f"CAM{cam_number} {current_time}"
+        # CPU 정보 (우측 상단)
+        cpu_text = f"CPU: {cpu_percent:.1f}%% | {cpu_temp:.1f}°C"
+        
+        # 실시간 오버레이 필터
+        overlay_filter = (
+            f"drawtext=text='{cam_time_text}':fontcolor=white:fontsize=24:"
+            f"box=1:boxcolor=black@0.5:boxborderw=5:x=10:y=10,"
+            f"drawtext=text='{cpu_text}':fontcolor=white:fontsize=16:"
+            f"box=1:boxcolor=black@0.5:boxborderw=3:x=w-tw-10:y=10"
+        )
+        
+        print(f"📝 실시간 오버레이: {cam_time_text} | {cpu_text}")
+        
+        # ffmpeg로 오버레이 추가
+        overlay_cmd = [
+            "ffmpeg",
+            "-i", temp_h264,
+            "-vf", overlay_filter,
+            "-c:v", "libx264",
+            "-preset", "ultrafast", 
+            "-crf", "23",
+            "-y",
+            output_file
+        ]
+        
+        overlay_result = subprocess.run(overlay_cmd, capture_output=True, text=True)
+        
+        # 임시 파일 삭제
+        try:
+            os.remove(temp_h264)
+        except:
+            pass
+        
+        if overlay_result.returncode != 0:
+            print("❌ 오버레이 추가 실패")
+            return False
+            
+        print("✅ 실시간 오버레이 촬영 완료")
+        return True
+        
+    except Exception as e:
+        print(f"❌ 촬영 오류: {e}")
+        
+        # 임시 파일 정리
+        try:
+            os.remove(temp_h264)
+        except:
+            pass
+            
+        return False
 
 def signal_handler(sig, frame):
     """시그널 핸들러"""
