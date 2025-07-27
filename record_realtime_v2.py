@@ -10,7 +10,7 @@ import csv
 # 사용자 설정
 video_duration_ms = 10000     # 촬영 시간 (밀리초) - 10초씩 끊어서 저장
 output_dir = "recordings"     # 저장 디렉토리
-log_file = "record_log.csv"   # 로그 파일명
+log_file = "record_log.csv"   # 로그 파일명11
 
 def get_cpu_info():
     try:
