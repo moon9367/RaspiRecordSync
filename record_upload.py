@@ -8,7 +8,7 @@ import threading
 import queue
 
 # 사용자 설정
-upload_interval_seconds = 10  # 촬영 간격 (초)
+upload_interval_seconds = 15  # 촬영 간격 (초) - 변환 시간 고려
 video_duration_ms = 10000     # 촬영 시간 (밀리초)
 cam_number = 1  # CAM 번호 설정 (필요시 수정)
 nas_ip = "tspol.iptime.org"
@@ -81,8 +81,8 @@ def convert_to_mp4(h264_file, mp4_file):
     
     # CAM 정보와 날짜시간 (좌측 상단)
     cam_time_info = f"CAM{cam_number} {current_time}"
-    # CPU 정보 (우측 상단)
-    cpu_info = f"CPU: {cpu_percent:.1f}% | {cpu_temp:.1f}°C"
+    # CPU 정보 (우측 상단) - % 문자를 이스케이프 처리
+    cpu_info = f"CPU: {cpu_percent:.1f}%% | {cpu_temp:.1f}°C"
     
     # 텍스트 파일 생성
     cam_text_file = "cam_text.txt"
@@ -103,7 +103,7 @@ def convert_to_mp4(h264_file, mp4_file):
         "ffmpeg", "-fflags", "+genpts",
         "-r", "30", "-i", h264_file,
         "-vf", filter_complex,
-        "-c:v", "libx264", "-preset", "fast", "-crf", "23", mp4_file
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28", mp4_file
     ]
     result = subprocess.run(convert_cmd)
     
@@ -189,6 +189,7 @@ def stop_upload_worker():
 def process_video(h264_file, mp4_file):
     """비디오 변환 및 전송을 처리하는 함수"""
     try:
+        print(f"🔄 백그라운드 변환 시작: {h264_file}")
         if convert_to_mp4(h264_file, mp4_file):
             os.remove(h264_file)
             print(f"🧹 중간파일 삭제: {h264_file}")
@@ -230,12 +231,13 @@ def main():
                     daemon=True
                 )
                 process_thread.start()
-                print("🔄 비디오 처리 스레드 시작됨")
+                print("🔄 백그라운드 처리 시작됨")
                 
             else:
                 print("❌ 촬영 실패")
 
-            print(f"⏳ {upload_interval_seconds}초 대기...")
+            # 3. 다음 촬영까지 대기 (변환 완료를 기다리지 않음)
+            print(f"⏳ {upload_interval_seconds}초 후 다음 촬영...")
             time.sleep(upload_interval_seconds)
             
     except KeyboardInterrupt:
