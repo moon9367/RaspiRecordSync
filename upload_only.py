@@ -49,8 +49,22 @@ def convert_to_mp4(h264_file, mp4_file):
     """H.264 파일을 MP4로 변환하면서 오버레이를 추가합니다."""
     print(f"🔄 변환 중: {os.path.basename(h264_file)}")
     
-    # 현재 날짜시간과 CPU 정보 가져오기
-    current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    # 파일명에서 촬영 시간 추출
+    filename = os.path.basename(h264_file)
+    if filename.startswith("video_") and filename.endswith(".h264"):
+        timestamp_str = filename[6:-5]  # "video_" 제거하고 ".h264" 제거
+        try:
+            # YYYYMMDD_HHMMSS 형식을 datetime으로 변환
+            recording_time = datetime.datetime.strptime(timestamp_str, "%Y%m%d_%H%M%S")
+            # 촬영 시점의 시간 사용
+            current_time = recording_time.strftime("%Y-%m-%d %H:%M:%S")
+        except:
+            # 파싱 실패 시 현재 시간 사용
+            current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    else:
+        current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    # CPU 정보 가져오기 (현재 시점)
     cpu_percent, cpu_temp = get_cpu_info()
     
     # CAM 정보와 날짜시간 (좌측 상단)

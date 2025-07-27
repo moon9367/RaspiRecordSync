@@ -10,12 +10,8 @@ if ! command -v ffmpeg &> /dev/null; then
     exit 1
 fi
 
-# 카메라 장치 확인
-if [ ! -e "/dev/video0" ]; then
-    echo "❌ 카메라 장치 /dev/video0를 찾을 수 없습니다."
-    echo "💡 USB 카메라를 연결하거나 카메라 모듈을 활성화하세요."
-    exit 1
-fi
+# 카메라 장치 확인 (rpicam-vid 사용하므로 제거)
+echo "📹 Raspberry Pi Camera 사용"
 
 # Python 패키지 확인
 echo "🐍 Python 패키지 확인 중..."
