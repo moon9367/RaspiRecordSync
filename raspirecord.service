@@ -4,9 +4,9 @@ After=network.target
 
 [Service]
 Type=simple
-User=pi
-WorkingDirectory=/home/pi/RaspiRecordSync
-ExecStart=/bin/bash /home/pi/RaspiRecordSync/start_realtime_system.sh
+User=tspol
+WorkingDirectory=/home/tspol/RaspiRecordSync
+ExecStart=/bin/bash /home/tspol/RaspiRecordSync/start_realtime_system.sh
 Restart=always
 RestartSec=10
 StandardOutput=journal
