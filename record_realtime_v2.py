@@ -10,7 +10,7 @@ import sys
 # 사용자 설정
 upload_interval_seconds = 10  # 촬영 간격 (초)
 video_duration_ms = 10000     # 촬영 시간 (밀리초)
-cam_number = 1  # CAM 번호 설정 (필요시 수정)
+cam_number = 1  # CAM 번호 설정 (필요시 수정)11
 output_dir = "recordings"     # 저장 디렉토리
 
 # 전역 변수
