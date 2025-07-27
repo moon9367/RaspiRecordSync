@@ -3,7 +3,6 @@ import datetime
 import os
 import time
 import psutil
-import threading
 import signal
 import sys
 
@@ -49,7 +48,7 @@ def update_cpu_overlay_text():
             print(f"오버레이 텍스트 업데이트 오류: {e}")
             time.sleep(1)
 
-def record_video_with_realtime_overlay(output_file):
+def record_video_with_overlay(output_file):
     print(f"▶ 실시간 촬영 시작: {output_file}")
     temp_h264 = output_file.replace('.h264', '_temp.h264')
     try:
@@ -71,12 +70,16 @@ def record_video_with_realtime_overlay(output_file):
         if record_result.returncode != 0:
             print("❌ 촬영 실패")
             return False
-        # 2단계: 오버레이 추가
+        # 2단계: 변환 시점의 날짜/시간, CPU 정보로 오버레이 추가
+        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cpu_percent, cpu_temp = get_cpu_info()
+        cam_time_text = f"CAM{cam_number} {now}"
+        cpu_text = f"CPU: {cpu_percent:.1f}% | {cpu_temp:.1f}°C"
         overlay_filter = (
-            "drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:"
-            f"text='CAM{cam_number} %{{localtime}}':fontcolor=white:fontsize=24:box=1:boxcolor=black@0.5:boxborderw=5:x=10:y=10,"  # 좌측상단 실시간 시간
-            "drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:"
-            "textfile=cpu_overlay.txt:reload=1:fontcolor=white:fontsize=16:box=1:boxcolor=black@0.5:boxborderw=3:x=w-tw-10:y=10"
+            f"drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:"
+            f"text='{cam_time_text}':fontcolor=white:fontsize=24:box=1:boxcolor=black@0.5:boxborderw=5:x=10:y=10,"
+            f"drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:"
+            f"text='{cpu_text}':fontcolor=white:fontsize=16:box=1:boxcolor=black@0.5:boxborderw=3:x=w-tw-10:y=10"
         )
         overlay_cmd = [
             "ffmpeg",
@@ -96,7 +99,7 @@ def record_video_with_realtime_overlay(output_file):
         if overlay_result.returncode != 0:
             print("❌ 오버레이 추가 실패")
             return False
-        print("✅ 실시간 오버레이 촬영 완료")
+        print("✅ 오버레이 촬영 완료")
         return True
     except Exception as e:
         print(f"❌ 촬영 오류: {e}")
@@ -114,7 +117,7 @@ def signal_handler(sig, frame):
 
 def main():
     global stop_monitoring
-    print("🎬 RaspiRecordSync - 실시간 오버레이 촬영 v2")
+    print("🎬 RaspiRecordSync - 오버레이 촬영 (변환 시점 정보)")
     print(f"📹 CAM{cam_number} | 촬영 시간: {video_duration_ms//1000}초씩 연속 저장")
     print(f"📁 저장 위치: {output_dir}")
     print("🔄 실시간 CPU 모니터링 활성화")
@@ -130,8 +133,8 @@ def main():
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             h264_file = os.path.join(output_dir, f"video_{timestamp}.h264")
             print(f"\n🎬 실시간 촬영 시작: {timestamp}")
-            if record_video_with_realtime_overlay(h264_file):
-                print("✅ 실시간 촬영 완료")
+            if record_video_with_overlay(h264_file):
+                print("✅ 오버레이 촬영 완료")
                 print(f"💾 저장됨: {h264_file}")
             else:
                 print("❌ 실시간 촬영 실패")
