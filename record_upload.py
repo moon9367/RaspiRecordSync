@@ -8,7 +8,7 @@ import threading
 import queue
 
 # 사용자 설정
-upload_interval_seconds = 15  # 촬영 간격 (초) - 변환 시간 고려
+upload_interval_seconds = 15  # 촬영 간격 (초) - 변환 시간 고려...
 video_duration_ms = 10000     # 촬영 시간 (밀리초)
 cam_number = 1  # CAM 번호 설정 (필요시 수정)
 nas_ip = "tspol.iptime.org"
