@@ -7,6 +7,7 @@ import requests
 import threading
 import queue
 import glob
+from discord_notify import DiscordNotifier
 
 # 사용자 설정
 input_dir = "recordings"      # 입력 디렉토리
@@ -15,6 +16,9 @@ nas_port = 8888
 upload_path = "/cam/upload.php"
 check_interval = 5  # 파일 체크 간격 (초)
 log_file = "record_log.csv"
+
+# 디스코드 웹훅 URL (record_realtime_v2.py와 동일한 URL 사용)
+DISCORD_WEBHOOK_URL = "https://discordapp.com/api/webhooks/1398962742618095667/IVnyN4mNDHGHZxkJ_8b4N-IhIkM95kihJf25ZpXEEHqohY3GC9rOeB4BPyZVnUzXKv_T"
 
 # 전송 큐 및 상태 관리
 upload_queue = queue.Queue()
@@ -39,7 +43,7 @@ def convert_to_mp4(h264_file, mp4_file):
     result = subprocess.run(convert_cmd, capture_output=True, text=True)
     return result.returncode == 0
 
-def upload_to_nas(file_path):
+def upload_to_nas(file_path, discord_notifier=None):
     """NAS로 파일을 업로드합니다."""
     print(f"🚀 NAS로 업로드 중: {os.path.basename(file_path)}")
     url = f"http://{nas_ip}:{nas_port}{upload_path}?filename={os.path.basename(file_path)}"
@@ -48,18 +52,50 @@ def upload_to_nas(file_path):
             response = requests.post(url, data=f)
         if response.status_code == 200:
             print(f"✅ 업로드 완료: {os.path.basename(file_path)}")
+            
+            # 디스코드 알림 전송
+            if discord_notifier:
+                file_size = os.path.getsize(file_path) / (1024 * 1024)  # MB 단위
+                discord_notifier.send_message(
+                    f"📤 **NAS 업로드 완료**\n"
+                    f"📁 파일: `{os.path.basename(file_path)}`\n"
+                    f"📊 크기: `{file_size:.1f} MB`\n"
+                    f"⏰ 시간: `{datetime.datetime.now().strftime('%H:%M:%S')}`"
+                )
+            
             return True
         else:
             print(f"❌ 업로드 실패: {os.path.basename(file_path)} - 상태 코드: {response.status_code}")
             print(response.text)
+            
+            # 디스코드 오류 알림
+            if discord_notifier:
+                discord_notifier.send_error_notification(
+                    f"NAS 업로드 실패: {os.path.basename(file_path)} (상태 코드: {response.status_code})"
+                )
+            
             return False
     except Exception as e:
         print(f"❌ 업로드 중 예외 발생: {e}")
+        
+        # 디스코드 오류 알림
+        if discord_notifier:
+            discord_notifier.send_error_notification(f"NAS 업로드 오류: {e}")
+        
         return False
 
 def upload_worker():
     global stop_upload_thread
     print("📤 전송 워커 시작")
+    
+    # 디스코드 알림 초기화
+    discord_notifier = None
+    try:
+        discord_notifier = DiscordNotifier(DISCORD_WEBHOOK_URL)
+        print("✅ 디스코드 알림 활성화됨")
+    except Exception as e:
+        print(f"⚠️ 디스코드 알림 초기화 실패: {e}")
+    
     while not stop_upload_thread:
         try:
             file_path = upload_queue.get(timeout=5)
@@ -67,7 +103,7 @@ def upload_worker():
                 break
             print(f"📤 전송 큐에서 파일 가져옴: {os.path.basename(file_path)}")
             if os.path.exists(file_path):
-                if upload_to_nas(file_path):
+                if upload_to_nas(file_path, discord_notifier):
                     # 업로드 성공 시 로컬 파일 삭제(단, 로그 파일은 삭제하지 않음)
                     if not file_path.endswith('.csv'):
                         os.remove(file_path)
@@ -80,6 +116,8 @@ def upload_worker():
             continue
         except Exception as e:
             print(f"❌ 전송 워커 오류: {e}")
+            if discord_notifier:
+                discord_notifier.send_error_notification(f"전송 워커 오류: {e}")
             time.sleep(1)
     print("📤 전송 워커 종료")
 

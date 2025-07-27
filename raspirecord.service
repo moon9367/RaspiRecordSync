@@ -11,6 +11,7 @@ Restart=always
 RestartSec=10
 StandardOutput=journal
 StandardError=journal
+Environment=PYTHONPATH=/home/tspol/RaspiRecordSync
 
 [Install]
 WantedBy=multi-user.target 

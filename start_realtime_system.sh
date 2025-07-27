@@ -21,6 +21,13 @@ if [ $? -ne 0 ]; then
     pip install psutil requests
 fi
 
+# discord_notify.py 파일 존재 확인
+if [ ! -f "discord_notify.py" ]; then
+    echo "❌ discord_notify.py 파일이 없습니다."
+    exit 1
+fi
+echo "✅ discord_notify.py 파일 확인됨"
+
 # recordings 디렉토리 생성
 mkdir -p recordings
 

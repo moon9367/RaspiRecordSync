@@ -6,11 +6,18 @@ import psutil
 import signal
 import sys
 import csv
+from discord_notify import DiscordNotifier
 
 # 사용자 설정
-video_duration_ms = 60000     # 촬영 시간 (밀리초) - 60초씩 끊어서 저장
+video_duration_ms = 60*60000     # 촬영 시간 (밀리초) - 1시간씩 끊어서 저장
 output_dir = "recordings"     # 저장 디렉토리
 log_file = "record_log.csv"   # 로그 파일명
+
+# 디스코드 웹훅 URL 설정
+# 1. 디스코드 채널에서 설정 → 연동 → 웹훅 생성
+# 2. 웹훅 URL 복사 (예: https://discord.com/api/webhooks/123456789/abcdef...)
+# 3. 아래에 붙여넣기
+DISCORD_WEBHOOK_URL = "https://discordapp.com/api/webhooks/1398962742618095667/IVnyN4mNDHGHZxkJ_8b4N-IhIkM95kihJf25ZpXEEHqohY3GC9rOeB4BPyZVnUzXKv_T"
 
 def get_cpu_info():
     try:
@@ -116,16 +123,30 @@ def main():
     print(f"📁 저장 위치: {output_dir}")
     print(f"📝 로그 파일: {log_file}")
     print(f"📊 CPU 정보 기록: {video_duration_ms//1000}초마다")
+    
+    # 디스코드 알림 초기화
+    discord_notifier = None
+    if DISCORD_WEBHOOK_URL != "YOUR_DISCORD_WEBHOOK_URL_HERE":
+        try:
+            discord_notifier = DiscordNotifier(DISCORD_WEBHOOK_URL)
+            discord_notifier.send_start_notification()
+            print("✅ 디스코드 알림 활성화됨")
+        except Exception as e:
+            print(f"⚠️ 디스코드 알림 초기화 실패: {e}")
+    else:
+        print("⚠️ 디스코드 웹훅 URL이 설정되지 않았습니다")
+    
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
     os.makedirs(output_dir, exist_ok=True)
+    
     try:
         while True:
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             h264_file = os.path.join(output_dir, f"video_{timestamp}.h264")
             print(f"\n🎬 촬영 시작: {timestamp}")
             
-            # 60초마다 CPU 정보 수집 및 로그 기록
+            # 1시간마다 CPU 정보 수집 및 로그 기록
             cpu_percent, cpu_temp = get_cpu_info()
             print(f"📊 CPU 사용률: {cpu_percent:.1f}%, 온도: {cpu_temp:.1f}°C")
             
@@ -133,13 +154,28 @@ def main():
                 print(f"💾 저장됨: {h264_file}")
                 log_to_csv(h264_file, timestamp, cpu_percent, cpu_temp)
                 print(f"📝 로그 기록 완료: {h264_file}, {timestamp}, {cpu_percent:.1f}%, {cpu_temp:.1f}°C")
+                
+                # 디스코드 알림 전송
+                if discord_notifier:
+                    discord_notifier.send_recording_complete(
+                        os.path.basename(h264_file), 
+                        timestamp, 
+                        cpu_percent, 
+                        cpu_temp
+                    )
             else:
                 print("❌ 촬영 실패")
+                if discord_notifier:
+                    discord_notifier.send_error_notification("영상 촬영 실패")
             print("🔄 연속 촬영 진행...")
     except KeyboardInterrupt:
         print("\n🛑 실시간 촬영 중지됨")
+        if discord_notifier:
+            discord_notifier.send_stop_notification()
     except Exception as e:
         print(f"❌ 실시간 촬영 오류: {e}")
+        if discord_notifier:
+            discord_notifier.send_error_notification(f"시스템 오류: {e}")
     finally:
         print("👋 실시간 촬영 프로그램 종료")
 
