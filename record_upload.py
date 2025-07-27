@@ -65,9 +65,12 @@ def convert_to_mp4(h264_file, mp4_file):
     
     # 복합 필터: CAM+날짜시간(좌측 상단) + CPU 정보(우측 상단)
     # 텍스트에 공백이 있으므로 이스케이프 처리
+    cam_time_escaped = cam_time_info.replace(' ', '\\ ')
+    cpu_info_escaped = cpu_info.replace(' ', '\\ ')
+    
     filter_complex = (
-        f"drawtext=text='{cam_time_info.replace(' ', '\\\\ ')}':fontcolor=white:fontsize=24:box=1:boxcolor=black@0.5:boxborderw=5:x=10:y=10,"
-        f"drawtext=text='{cpu_info.replace(' ', '\\\\ ')}':fontcolor=white:fontsize=16:box=1:boxcolor=black@0.5:boxborderw=3:x=w-tw-10:y=10"
+        f"drawtext=text='{cam_time_escaped}':fontcolor=white:fontsize=24:box=1:boxcolor=black@0.5:boxborderw=5:x=10:y=10,"
+        f"drawtext=text='{cpu_info_escaped}':fontcolor=white:fontsize=16:box=1:boxcolor=black@0.5:boxborderw=3:x=w-tw-10:y=10"
     )
     
     convert_cmd = [
