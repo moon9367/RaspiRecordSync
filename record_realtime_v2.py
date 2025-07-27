@@ -14,7 +14,8 @@ log_file = "record_log.csv"   # 로그 파일명
 
 def get_cpu_info():
     try:
-        cpu_percent = psutil.cpu_percent(interval=0)
+        # CPU 사용률을 정확히 측정하기 위해 1초 대기
+        cpu_percent = psutil.cpu_percent(interval=1)
         temp_cmd = ["vcgencmd", "measure_temp"]
         temp_result = subprocess.run(temp_cmd, capture_output=True, text=True)
         if temp_result.returncode == 0:

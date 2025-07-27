@@ -24,6 +24,13 @@ fi
 # recordings 디렉토리 생성
 mkdir -p recordings
 
+# 이전 기록 파일들 정리
+echo "🧹 이전 기록 파일들 정리 중..."
+rm -f recordings/*.h264
+rm -f recordings/*.mp4
+rm -f record_log.csv
+echo "✅ 이전 기록 정리 완료"
+
 echo "✅ 시스템 준비 완료"
 echo ""
 

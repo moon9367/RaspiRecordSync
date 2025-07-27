@@ -115,11 +115,11 @@ def process_video(h264_file):
         return False
 
 def upload_log_periodically():
-    """10초마다 로그 파일을 NAS로 전송"""
+    """60초마다 로그 파일을 NAS로 전송"""
     while not stop_upload_thread:
         if os.path.exists(log_file):
             upload_queue.put(log_file)
-        time.sleep(10)
+        time.sleep(60)
 
 def main():
     print("📤 RaspiRecordSync - 전송 전용 (워터마크 없음, 로그 전송 포함)")
