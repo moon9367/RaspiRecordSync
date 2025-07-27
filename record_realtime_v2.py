@@ -8,9 +8,9 @@ import sys
 import csv
 
 # 사용자 설정
-video_duration_ms = 600000     # 촬영 시간 (밀리초) - 10초씩 끊어서 저장
+video_duration_ms = 60000     # 촬영 시간 (밀리초) - 60초씩 끊어서 저장
 output_dir = "recordings"     # 저장 디렉토리
-log_file = "record_log.csv"   # 로그 파일명11
+log_file = "record_log.csv"   # 로그 파일명
 
 def get_cpu_info():
     try:
@@ -77,6 +77,7 @@ def main():
     print(f"촬영 시간: {video_duration_ms//1000}초씩 연속 저장")
     print(f"📁 저장 위치: {output_dir}")
     print(f"📝 로그 파일: {log_file}")
+    print(f"📊 CPU 정보 기록: {video_duration_ms//1000}초마다")
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
     os.makedirs(output_dir, exist_ok=True)
@@ -85,11 +86,15 @@ def main():
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             h264_file = os.path.join(output_dir, f"video_{timestamp}.h264")
             print(f"\n🎬 촬영 시작: {timestamp}")
+            
+            # 60초마다 CPU 정보 수집 및 로그 기록
             cpu_percent, cpu_temp = get_cpu_info()
+            print(f"📊 CPU 사용률: {cpu_percent:.1f}%, 온도: {cpu_temp:.1f}°C")
+            
             if record_video(h264_file):
                 print(f"💾 저장됨: {h264_file}")
                 log_to_csv(h264_file, timestamp, cpu_percent, cpu_temp)
-                print(f"📝 로그 기록 완료: {h264_file}, {timestamp}, {cpu_percent:.1f}, {cpu_temp:.1f}")
+                print(f"📝 로그 기록 완료: {h264_file}, {timestamp}, {cpu_percent:.1f}%, {cpu_temp:.1f}°C")
             else:
                 print("❌ 촬영 실패")
             print("🔄 연속 촬영 진행...")
