@@ -14,7 +14,7 @@ output_dir = "recordings"     # 저장 디렉토리
 log_file = "record_log.csv"   # 로그 파일명
 
 # 디스코드 웹훅 URL 설정
-# 1. 디스코드 채널에서 설정 → 연동 → 웹훅 생성
+# 1. 디스코드 채널에서 설정 → 연동 → 웹훅 생성 553
 # 2. 웹훅 URL 복사 (예: https://discord.com/api/webhooks/123456789/abcdef...)
 # 3. 아래에 붙여넣기
 DISCORD_WEBHOOK_URL = "https://discordapp.com/api/webhooks/1398962742618095667/IVnyN4mNDHGHZxkJ_8b4N-IhIkM95kihJf25ZpXEEHqohY3GC9rOeB4BPyZVnUzXKv_T"
