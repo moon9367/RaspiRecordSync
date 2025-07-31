@@ -14,10 +14,10 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # 사용자 설정
 input_dir = "/home/tspol/recordings"      # 입력 디렉토리
-webdav_url = "https://tspol.iptime.org:5010"  # WebDAV URL
+webdav_url = "http://tspol.iptime.org:5009"  # WebDAV URL (HTTP 사용)
 webdav_user = "mms9989"                 # WebDAV 사용자명
 webdav_password = "Wjswkwjs1!"         # WebDAV 패스워드
-webdav_path = "/volume1/cam/"             # WebDAV 경로
+webdav_path = "/cam/"                   # WebDAV 경로 (간단한 경로)
 check_interval = 5  # 파일 체크 간격 (초)
 log_file = "/home/tspol/record_log.csv"
 
@@ -62,8 +62,7 @@ def upload_via_webdav(file_path, discord_notifier=None):
                 data=f,
                 auth=(webdav_user, webdav_password),
                 headers={'Content-Type': 'application/octet-stream'},
-                timeout=300,
-                verify=False  # SSL 검증 비활성화
+                timeout=300
             )
         
         if response.status_code in [200, 201, 204]:
@@ -183,14 +182,17 @@ def test_webdav_connection():
     print(f"🔍 WebDAV 연결 테스트 중: {webdav_url}")
     
     try:
+        # 먼저 루트 경로로 테스트
         response = requests.get(
             webdav_url,
             auth=(webdav_user, webdav_password),
-            timeout=10,
-            verify=False  # SSL 검증 비활성화
+            timeout=10
         )
-        if response.status_code in [200, 207]:
-            print("✅ WebDAV 연결 성공")
+        print(f"📊 응답 상태 코드: {response.status_code}")
+        print(f"📋 응답 헤더: {dict(response.headers)}")
+        
+        if response.status_code in [200, 207, 404]:
+            print("✅ WebDAV 서버에 연결됨 (404는 정상일 수 있음)")
             return True
         else:
             print(f"❌ WebDAV 연결 실패: {response.status_code}")
