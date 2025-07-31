@@ -221,4 +221,98 @@ class DiscordNotifier:
                 }
             ]
         }
-        return self.send_message("🚀 SSH 동기화 시스템 시작됨", embed) 
+        return self.send_message("🚀 SSH 동기화 시스템 시작됨", embed)
+    
+    def send_webdav_upload_complete(self, filename, file_size_mb, server_host, upload_time=None):
+        """WebDAV 업로드 완료 알림"""
+        if upload_time is None:
+            upload_time = datetime.datetime.now().strftime('%H:%M:%S')
+            
+        embed = {
+            "title": "📤 WebDAV 업로드 완료",
+            "description": f"파일이 WebDAV를 통해 원격 서버로 전송되었습니다.",
+            "color": 0x00ff00,  # 초록색
+            "timestamp": datetime.datetime.now().isoformat(),
+            "fields": [
+                {
+                    "name": "📁 파일명",
+                    "value": filename,
+                    "inline": False
+                },
+                {
+                    "name": "📊 파일 크기",
+                    "value": f"{file_size_mb:.1f} MB",
+                    "inline": True
+                },
+                {
+                    "name": "🌐 서버",
+                    "value": server_host,
+                    "inline": True
+                },
+                {
+                    "name": "⏰ 업로드 시간",
+                    "value": upload_time,
+                    "inline": True
+                }
+            ]
+        }
+        return self.send_message("✅ WebDAV 업로드 완료", embed)
+    
+    def send_webdav_upload_error(self, filename, error_message, server_host):
+        """WebDAV 업로드 오류 알림"""
+        embed = {
+            "title": "❌ WebDAV 업로드 실패",
+            "description": f"WebDAV를 통한 파일 업로드에 실패했습니다.",
+            "color": 0xff0000,  # 빨간색
+            "timestamp": datetime.datetime.now().isoformat(),
+            "fields": [
+                {
+                    "name": "📁 파일명",
+                    "value": filename,
+                    "inline": True
+                },
+                {
+                    "name": "🌐 서버",
+                    "value": server_host,
+                    "inline": True
+                },
+                {
+                    "name": "❌ 오류 내용",
+                    "value": error_message[:1000] + "..." if len(error_message) > 1000 else error_message,
+                    "inline": False
+                }
+            ]
+        }
+        return self.send_message("🚨 WebDAV 업로드 실패", embed)
+    
+    def send_webdav_system_start(self, server_host, server_user, remote_path):
+        """WebDAV 시스템 시작 알림"""
+        embed = {
+            "title": "🚀 WebDAV 동기화 시스템 시작",
+            "description": "WebDAV를 통한 파일 동기화 시스템이 시작되었습니다.",
+            "color": 0x0099ff,  # 파란색
+            "timestamp": datetime.datetime.now().isoformat(),
+            "fields": [
+                {
+                    "name": "🌐 WebDAV 서버",
+                    "value": server_host,
+                    "inline": True
+                },
+                {
+                    "name": "👤 사용자",
+                    "value": server_user,
+                    "inline": True
+                },
+                {
+                    "name": "📁 원격 경로",
+                    "value": remote_path,
+                    "inline": True
+                },
+                {
+                    "name": "🔄 동기화 방식",
+                    "value": "WebDAV HTTP",
+                    "inline": True
+                }
+            ]
+        }
+        return self.send_message("🚀 WebDAV 동기화 시스템 시작됨", embed) 
