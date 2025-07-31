@@ -48,12 +48,12 @@ echo "✅ 안정적인 실시간 오버레이 사용"
 echo ""
 echo "🎬 실시간 오버레이 촬영 시스템 시작..."
 echo "📹 촬영 스크립트: $RECORD_SCRIPT"
-echo "📤 전송 스크립트: upload_only.py"
+echo "📤 전송 스크립트: upload_webdav.py"
 echo ""
 
 # 백그라운드에서 전송 스크립트 시작
-echo "📤 전송 시스템 시작..."
-python3 upload_only.py &
+echo "📤 WebDAV 전송 시스템 시작..."
+python3 upload_webdav.py &
 UPLOAD_PID=$!
 
 # 잠시 대기
