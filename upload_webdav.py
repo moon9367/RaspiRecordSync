@@ -6,7 +6,11 @@ import psutil
 import threading
 import queue
 import glob
+import urllib3
 from discord_notify import DiscordNotifier
+
+# SSL 경고 비활성화
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # 사용자 설정
 input_dir = "/home/tspol/recordings"      # 입력 디렉토리
@@ -58,7 +62,8 @@ def upload_via_webdav(file_path, discord_notifier=None):
                 data=f,
                 auth=(webdav_user, webdav_password),
                 headers={'Content-Type': 'application/octet-stream'},
-                timeout=300
+                timeout=300,
+                verify=False  # SSL 검증 비활성화
             )
         
         if response.status_code in [200, 201, 204]:
@@ -181,7 +186,8 @@ def test_webdav_connection():
         response = requests.get(
             webdav_url,
             auth=(webdav_user, webdav_password),
-            timeout=10
+            timeout=10,
+            verify=False  # SSL 검증 비활성화
         )
         if response.status_code in [200, 207]:
             print("✅ WebDAV 연결 성공")
