@@ -56,19 +56,32 @@ class RTSPStreamer:
                 video_device = "/dev/video0"
                 print(f"⚠️ 장치 확인 오류, 기본값 사용: {video_device}")
             
-            # FFmpeg만 사용 (rpicam-vid 파이프 문제로 인해)
+            # rpicam-vid로 파일 생성 후 FFmpeg로 스트리밍
+            temp_file = "/tmp/rtsp_stream.h264"
+            
+            # rpicam-vid 명령어
+            rpicam_cmd = [
+                "rpicam-vid",
+                "--inline",                      # 인라인 헤더
+                "--codec", "h264",              # H.264 코덱
+                "--width", "1280",              # 너비
+                "--height", "720",              # 높이
+                "--framerate", "25",            # 프레임레이트
+                "--bitrate", "2500000",         # 비트레이트 (2.5Mbps)
+                "--profile", "baseline",        # 베이스라인 프로파일
+                "--level", "3.1",               # 레벨
+                "--intra", "25",                # I-프레임 간격
+                "--output", temp_file,          # 임시 파일로 출력
+                "--timeout", "0"                # 무한 실행
+            ]
+            
+            # FFmpeg 명령어 (파일에서 읽어서 RTSP로 스트리밍)
             ffmpeg_cmd = [
                 "ffmpeg",
-                "-f", "v4l2",                   # Video4Linux2 입력
-                "-i", video_device,             # 카메라 장치
-                "-c:v", "libx264",              # H.264 코덱
-                "-preset", "ultrafast",         # 빠른 인코딩
-                "-tune", "zerolatency",         # 지연 최소화
-                "-b:v", "2500k",                # 비트레이트
-                "-maxrate", "2500k",            # 최대 비트레이트
-                "-bufsize", "5000k",            # 버퍼 크기
-                "-pix_fmt", "yuv420p",          # 픽셀 포맷
-                "-g", "25",                     # GOP 크기
+                "-re",                          # 실시간 재생
+                "-f", "h264",                   # H.264 입력
+                "-i", temp_file,                # 임시 파일 입력
+                "-c:v", "copy",                 # 코덱 복사
                 "-f", "rtsp",                   # RTSP 출력
                 "-rtsp_transport", "tcp",       # TCP 전송
                 f"rtsp://0.0.0.0:{RTSP_PORT}/{RTSP_PATH}"
@@ -76,8 +89,20 @@ class RTSPStreamer:
             
 
             
-            # FFmpeg만 사용 (rpicam-vid 파이프 문제로 인해)
-            print("🚀 FFmpeg를 사용한 RTSP 스트림 시작...")
+            # rpicam-vid 시작
+            print("🚀 rpicam-vid로 비디오 캡처 시작...")
+            print(f"rpicam-vid 명령어: {' '.join(rpicam_cmd)}")
+            self.rpicam_process = subprocess.Popen(
+                rpicam_cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+            
+            # rpicam-vid가 파일을 생성할 때까지 대기
+            time.sleep(5)
+            
+            # FFmpeg로 RTSP 스트리밍 시작
+            print("🚀 FFmpeg로 RTSP 스트리밍 시작...")
             print(f"FFmpeg 명령어: {' '.join(ffmpeg_cmd)}")
             self.rtsp_process = subprocess.Popen(
                 ffmpeg_cmd,
