@@ -38,11 +38,29 @@ class RTSPStreamer:
         try:
             print(f"🎥 RTSP 스트림 시작: {RTSP_URL}")
             
+            # 사용 가능한 비디오 장치 확인
+            print("🔍 사용 가능한 비디오 장치 확인 중...")
+            try:
+                result = subprocess.run(["ls", "/dev/video*"], capture_output=True, text=True)
+                if result.returncode == 0:
+                    devices = result.stdout.strip().split('\n')
+                    print(f"📹 발견된 비디오 장치: {devices}")
+                    
+                    # 첫 번째 장치 사용
+                    video_device = devices[0] if devices else "/dev/video0"
+                    print(f"🎥 사용할 장치: {video_device}")
+                else:
+                    video_device = "/dev/video0"
+                    print(f"⚠️ 장치 확인 실패, 기본값 사용: {video_device}")
+            except Exception as e:
+                video_device = "/dev/video0"
+                print(f"⚠️ 장치 확인 오류, 기본값 사용: {video_device}")
+            
             # FFmpeg만 사용 (rpicam-vid 파이프 문제로 인해)
             ffmpeg_cmd = [
                 "ffmpeg",
                 "-f", "v4l2",                   # Video4Linux2 입력
-                "-i", "/dev/video0",            # 카메라 장치
+                "-i", video_device,             # 카메라 장치
                 "-c:v", "libx264",              # H.264 코덱
                 "-preset", "ultrafast",         # 빠른 인코딩
                 "-tune", "zerolatency",         # 지연 최소화
