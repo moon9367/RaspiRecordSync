@@ -143,18 +143,35 @@ class RTSPStreamer:
     
     def stop_rtsp_stream(self):
         """RTSP 스트림 중지"""
-        if self.rtsp_process:
+        if hasattr(self, 'rtsp_process') and self.rtsp_process:
             print("🛑 RTSP 스트림 중지 중...")
             self.rtsp_process.terminate()
             try:
                 self.rtsp_process.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 self.rtsp_process.kill()
-            self.is_running = False
-            print("✅ RTSP 스트림 중지됨")
-            
-            if self.discord_notifier:
-                self.discord_notifier.send_rtsp_stop_notification()
+        
+        if hasattr(self, 'rpicam_process') and self.rpicam_process:
+            print("🛑 rpicam-vid 중지 중...")
+            self.rpicam_process.terminate()
+            try:
+                self.rpicam_process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                self.rpicam_process.kill()
+        
+        # 임시 파일 정리
+        try:
+            if os.path.exists("/tmp/rtsp_stream.h264"):
+                os.remove("/tmp/rtsp_stream.h264")
+                print("🗑️ 임시 파일 정리됨")
+        except:
+            pass
+        
+        self.is_running = False
+        print("✅ RTSP 스트림 중지됨")
+        
+        if self.discord_notifier:
+            self.discord_notifier.send_rtsp_stop_notification()
     
     def check_rtsp_status(self):
         """RTSP 스트림 상태 확인"""
