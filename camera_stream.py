@@ -103,7 +103,7 @@ class CameraStream:
                 print("📁 스트림 파일: /tmp/rtsp_stream.h264")
                 
                 if self.discord_notifier:
-                    self.discord_notifier.send_notification("카메라 스트림 시작됨")
+                    self.discord_notifier.send_message("📹 카메라 스트림 시작됨")
                 
                 return True
             else:
@@ -135,7 +135,7 @@ class CameraStream:
         print("✅ 카메라 스트림 중지됨")
         
         if self.discord_notifier:
-            self.discord_notifier.send_notification("카메라 스트림 중지됨")
+            self.discord_notifier.send_message("🛑 카메라 스트림 중지됨")
     
     def check_stream_status(self):
         """카메라 스트림 상태 확인"""
