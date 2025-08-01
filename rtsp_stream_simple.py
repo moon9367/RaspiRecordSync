@@ -38,7 +38,7 @@ class RTSPStreamer:
         try:
             print(f"🎥 RTSP 스트림 시작: {RTSP_URL}")
             
-            # 방법 1: rpicam-vid를 직접 RTSP로 스트리밍 (가장 안정적)
+            # 방법 1: rpicam-vid를 직접 RTSP로 스트리밍 (수정된 버전)
             rtsp_cmd = [
                 "rpicam-vid",
                 "--inline",                      # 인라인 헤더
@@ -57,7 +57,6 @@ class RTSPStreamer:
                 "-c:v", "copy",                 # 코덱 복사
                 "-f", "rtsp",                   # RTSP 출력
                 "-rtsp_transport", "tcp",       # TCP 전송
-                "-rtsp_listen", "1",            # RTSP 리스너
                 f"rtsp://0.0.0.0:{RTSP_PORT}/{RTSP_PATH}"
             ]
             
@@ -76,7 +75,6 @@ class RTSPStreamer:
                 "-g", "25",                     # GOP 크기
                 "-f", "rtsp",                   # RTSP 출력
                 "-rtsp_transport", "tcp",       # TCP 전송
-                "-rtsp_listen", "1",            # RTSP 리스너
                 f"rtsp://0.0.0.0:{RTSP_PORT}/{RTSP_PATH}"
             ]
             
