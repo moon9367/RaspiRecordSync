@@ -69,18 +69,19 @@ class CameraStream:
                 print("❌ 카메라 상태 확인 실패")
                 return False
             
-            # rpicam-vid 명령어
+            # rpicam-vid 명령어 (record_realtime_v2.py 참조)
             rpicam_cmd = [
                 "rpicam-vid",
                 "-t", "0",                     # 무한 실행
                 "--codec", "h264",             # H.264 코덱
-                "--width", "1280",             # 너비
-                "--height", "720",             # 높이
-                "--framerate", "25",           # 프레임레이트
-                "--bitrate", "2500000",        # 비트레이트
                 "--output", "/tmp/rtsp_stream.h264", # 파일로 출력
-                "--inline",                    # 인라인 헤더
-                "--nopreview"                  # 미리보기 비활성화
+                "--width", "1920",             # 너비 (record_realtime_v2.py와 동일)
+                "--height", "1080",            # 높이 (record_realtime_v2.py와 동일)
+                "--framerate", "30",           # 프레임레이트 (record_realtime_v2.py와 동일)
+                "--autofocus-mode", "auto",    # 자동 초점 모드
+                "--autofocus-speed", "normal", # 자동 초점 속도
+                "--autofocus-range", "normal", # 자동 초점 범위
+                "--vflip"                      # 세로 뒤집기
             ]
             
             print(f"rpicam-vid 명령어: {' '.join(rpicam_cmd)}")
