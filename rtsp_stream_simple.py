@@ -143,42 +143,13 @@ class RTSPStreamer:
                 video_device = "/dev/video0"
                 print(f"⚠️ 장치 확인 오류, 기본값 사용: {video_device}")
             
-            # 임시 파일 경로
-            temp_file = "/tmp/rtsp_stream.h264"
+            # 방법 1: rpicam-vid + ffmpeg 직접 파이프라인
+            print("\n" + "=" * 50)
+            print("🚀 RTSP 스트리밍 시작...")
+            print("=" * 50)
             
-            # 방법 1: rpicam-vid 사용 (최신 라즈베리파이 OS용)
+            # rpicam-vid + ffmpeg 파이프라인
             rpicam_cmd = [
-                "rpicam-vid",
-                "-t", "0",                      # 무한 실행
-                "--codec", "h264",              # H.264 코덱
-                "--width", "1280",              # 너비
-                "--height", "720",              # 높이
-                "--framerate", "25",            # 프레임레이트
-                "--bitrate", "2500000",         # 비트레이트 (2.5Mbps)
-                "--output", temp_file,          # 파일로 출력
-                "--inline",                     # 인라인 헤더
-                "--profile", "baseline",        # 베이스라인 프로파일
-                "--level", "3.1"               # 레벨
-            ]
-            
-            # 방법 2: v4l2loopback + ffmpeg 사용
-            v4l2_cmd = [
-                "ffmpeg",
-                "-f", "v4l2",                  # v4l2 입력
-                "-i", video_device,             # 비디오 장치
-                "-video_size", "1280x720",      # 해상도
-                "-framerate", "25",             # 프레임레이트
-                "-c:v", "libx264",             # H.264 코덱
-                "-preset", "ultrafast",         # 빠른 인코딩
-                "-tune", "zerolatency",         # 지연 최소화
-                "-b:v", "2500000",             # 비트레이트
-                "-f", "h264",                  # H.264 출력
-                "-y",                          # 파일 덮어쓰기
-                temp_file
-            ]
-            
-            # 방법 3: 직접 RTSP 스트리밍 (rpicam-vid + ffmpeg)
-            direct_rtsp_cmd = [
                 "rpicam-vid",
                 "-t", "0",                     # 무한 실행
                 "--codec", "h264",             # H.264 코덱
@@ -198,16 +169,16 @@ class RTSPStreamer:
                 "-c:v", "copy",                # 코덱 복사
                 "-f", "rtsp",                  # RTSP 출력
                 "-rtsp_transport", "tcp",      # TCP 전송
+                "-listen", "1",                # RTSP 서버 모드
                 f"rtsp://0.0.0.0:{RTSP_PORT}/{RTSP_PATH}"
             ]
             
-            # 방법 1 시도: rpicam-vid로 파일 생성 후 FFmpeg로 스트리밍
-            print("\n" + "=" * 50)
-            print("🚀 방법 1: rpicam-vid로 비디오 캡처 시작...")
-            print("=" * 50)
-            print(f"rpicam-vid 명령어: {' '.join(rpicam_cmd)}")
-            
             try:
+                print("🚀 rpicam-vid + ffmpeg 파이프라인 시작...")
+                print(f"rpicam-vid 명령어: {' '.join(rpicam_cmd)}")
+                print(f"ffmpeg 명령어: {' '.join(ffmpeg_rtsp_cmd)}")
+                
+                # rpicam-vid 프로세스 시작
                 print("📹 rpicam-vid 프로세스 시작 중...")
                 self.video_process = subprocess.Popen(
                     rpicam_cmd,
@@ -216,147 +187,54 @@ class RTSPStreamer:
                 )
                 print("✅ rpicam-vid 프로세스 시작됨")
                 
-                # 파일이 생성될 때까지 대기
-                print("⏳ rpicam-vid가 파일을 생성할 때까지 대기 중...")
-                for i in range(15):  # 15초 대기
-                    time.sleep(1)
-                    if os.path.exists(temp_file):
-                        file_size = os.path.getsize(temp_file)
-                        print(f"✅ 파일 생성됨: {temp_file} (크기: {file_size} bytes)")
-                        break
-                    else:
-                        print(f"⏳ 대기 중... ({i+1}/15초)")
+                # ffmpeg 프로세스 시작 (rpicam-vid의 출력을 입력으로 받음)
+                print("📺 FFmpeg 프로세스 시작 중...")
+                self.rtsp_process = subprocess.Popen(
+                    ffmpeg_rtsp_cmd,
+                    stdin=self.video_process.stdout,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE
+                )
+                print("✅ FFmpeg 프로세스 시작됨")
                 
-                if os.path.exists(temp_file):
-                    file_size = os.path.getsize(temp_file)
-                    print(f"✅ 파일 생성 확인됨: {temp_file} (크기: {file_size} bytes)")
+                # 프로세스 시작 확인
+                print("⏳ 프로세스 상태 확인 중...")
+                time.sleep(5)
+                
+                rpicam_status = self.video_process.poll()
+                ffmpeg_status = self.rtsp_process.poll()
+                
+                print(f"rpicam-vid 상태: {'실행 중' if rpicam_status is None else f'종료됨 (코드: {rpicam_status})'}")
+                print(f"ffmpeg 상태: {'실행 중' if ffmpeg_status is None else f'종료됨 (코드: {ffmpeg_status})'}")
+                
+                if ffmpeg_status is None and rpicam_status is None:
+                    self.is_running = True
+                    pi_ip = get_raspberry_pi_ip()
+                    print(f"✅ RTSP 스트림 시작됨: rtsp://{pi_ip}:{RTSP_PORT}/{RTSP_PATH}")
                     
-                    # FFmpeg로 RTSP 스트리밍
-                    ffmpeg_cmd = [
-                        "ffmpeg",
-                        "-re",                          # 실시간 재생
-                        "-fflags", "+nobuffer",         # 버퍼링 비활성화
-                        "-analyzeduration", "1000000",  # 분석 시간
-                        "-probesize", "5000000",        # 프로브 크기
-                        "-flags", "low_delay",          # 지연 최소화
-                        "-f", "h264",                   # H.264 입력
-                        "-i", temp_file,                # 파일 입력
-                        "-c:v", "copy",                 # 코덱 복사
-                        "-f", "rtsp",                   # RTSP 출력
-                        "-rtsp_transport", "tcp",       # TCP 전송
-                        f"rtsp://0.0.0.0:{RTSP_PORT}/{RTSP_PATH}"
-                    ]
+                    if self.discord_notifier:
+                        self.discord_notifier.send_rtsp_start_notification(RTSP_PORT, RTSP_PATH)
                     
-                    print("\n" + "=" * 50)
-                    print("🚀 FFmpeg로 RTSP 스트리밍 시작...")
-                    print("=" * 50)
-                    print(f"FFmpeg 명령어: {' '.join(ffmpeg_cmd)}")
-                    
-                    self.rtsp_process = subprocess.Popen(
-                        ffmpeg_cmd,
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE
-                    )
-                    
-                    # 프로세스 시작 확인
-                    print("⏳ FFmpeg 프로세스 시작 확인 중...")
-                    time.sleep(5)
-                    
-                    if self.rtsp_process.poll() is None:
-                        self.is_running = True
-                        pi_ip = get_raspberry_pi_ip()
-                        print(f"✅ RTSP 스트림 시작됨: rtsp://{pi_ip}:{RTSP_PORT}/{RTSP_PATH}")
-                        
-                        if self.discord_notifier:
-                            self.discord_notifier.send_rtsp_start_notification(RTSP_PORT, RTSP_PATH)
-                        
-                        return True
-                    else:
-                        print("❌ RTSP 스트림 시작 실패")
-                        # 오류 메시지 출력
-                        try:
+                    return True
+                else:
+                    print("❌ RTSP 스트림 시작 실패")
+                    # 오류 메시지 출력
+                    try:
+                        if rpicam_status is not None:
+                            stdout, stderr = self.video_process.communicate(timeout=1)
+                            if stderr:
+                                print(f"rpicam-vid 오류: {stderr.decode('utf-8', errors='ignore')}")
+                        if ffmpeg_status is not None:
                             stdout, stderr = self.rtsp_process.communicate(timeout=1)
                             if stderr:
-                                print(f"FFmpeg 오류 메시지: {stderr.decode('utf-8', errors='ignore')}")
-                            if stdout:
-                                print(f"FFmpeg 출력 메시지: {stdout.decode('utf-8', errors='ignore')}")
-                        except:
-                            pass
-                        return False
-                else:
-                    print("❌ 파일 생성 실패, 방법 2 시도")
-                    raise Exception("rpicam-vid 파일 생성 실패")
+                                print(f"ffmpeg 오류: {stderr.decode('utf-8', errors='ignore')}")
+                    except:
+                        pass
+                    return False
                     
             except Exception as e:
-                print(f"⚠️ 방법 1 실패: {e}")
-                print("\n" + "=" * 50)
-                print("🚀 방법 2: 직접 RTSP 스트리밍 시도...")
-                print("=" * 50)
-                
-                # 방법 2: 직접 RTSP 스트리밍
-                try:
-                    print("🚀 rpicam-vid + ffmpeg 파이프라인 시작...")
-                    print(f"rpicam-vid 명령어: {' '.join(direct_rtsp_cmd)}")
-                    print(f"ffmpeg 명령어: {' '.join(ffmpeg_rtsp_cmd)}")
-                    
-                    # rpicam-vid 프로세스 시작
-                    print("📹 rpicam-vid 프로세스 시작 중...")
-                    self.video_process = subprocess.Popen(
-                        direct_rtsp_cmd,
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE
-                    )
-                    print("✅ rpicam-vid 프로세스 시작됨")
-                    
-                    # ffmpeg 프로세스 시작 (rpicam-vid의 출력을 입력으로 받음)
-                    print("📺 FFmpeg 프로세스 시작 중...")
-                    self.rtsp_process = subprocess.Popen(
-                        ffmpeg_rtsp_cmd,
-                        stdin=self.video_process.stdout,
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE
-                    )
-                    print("✅ FFmpeg 프로세스 시작됨")
-                    
-                    # 프로세스 시작 확인
-                    print("⏳ 프로세스 상태 확인 중...")
-                    time.sleep(5)
-                    
-                    rpicam_status = self.video_process.poll()
-                    ffmpeg_status = self.rtsp_process.poll()
-                    
-                    print(f"rpicam-vid 상태: {'실행 중' if rpicam_status is None else f'종료됨 (코드: {rpicam_status})'}")
-                    print(f"ffmpeg 상태: {'실행 중' if ffmpeg_status is None else f'종료됨 (코드: {ffmpeg_status})'}")
-                    
-                    if ffmpeg_status is None and rpicam_status is None:
-                        self.is_running = True
-                        pi_ip = get_raspberry_pi_ip()
-                        print(f"✅ 직접 RTSP 스트림 시작됨: rtsp://{pi_ip}:{RTSP_PORT}/{RTSP_PATH}")
-                        
-                        if self.discord_notifier:
-                            self.discord_notifier.send_rtsp_start_notification(RTSP_PORT, RTSP_PATH)
-                        
-                        return True
-                    else:
-                        print("❌ 직접 RTSP 스트림 시작 실패")
-                        # 오류 메시지 출력
-                        try:
-                            if rpicam_status is not None:
-                                stdout, stderr = self.video_process.communicate(timeout=1)
-                                if stderr:
-                                    print(f"rpicam-vid 오류: {stderr.decode('utf-8', errors='ignore')}")
-                            if ffmpeg_status is not None:
-                                stdout, stderr = self.rtsp_process.communicate(timeout=1)
-                                if stderr:
-                                    print(f"ffmpeg 오류: {stderr.decode('utf-8', errors='ignore')}")
-                        except:
-                            pass
-                        return False
-                        
-                except Exception as e2:
-                    print(f"⚠️ 방법 2도 실패: {e2}")
-                    print("❌ 모든 방법 실패")
-                    return False
+                print(f"⚠️ RTSP 스트림 시작 실패: {e}")
+                return False
                 
         except Exception as e:
             print(f"❌ RTSP 스트림 시작 실패: {e}")
