@@ -31,10 +31,11 @@ class RTSPStreamer:
     def __init__(self, discord_notifier=None):
         self.discord_notifier = discord_notifier
         self.rtsp_process = None
+        self.video_process = None
         self.is_running = False
         
     def start_rtsp_stream(self):
-        """RTSP 스트림 시작 - 간단한 방법"""
+        """RTSP 스트림 시작 - 라즈베리파이 모듈3 카메라용"""
         try:
             print(f"🎥 RTSP 스트림 시작: {RTSP_URL}")
             
@@ -56,127 +57,167 @@ class RTSPStreamer:
                 video_device = "/dev/video0"
                 print(f"⚠️ 장치 확인 오류, 기본값 사용: {video_device}")
             
-            # rpicam-vid를 파일로 출력
+            # 임시 파일 경로
             temp_file = "/tmp/rtsp_stream.h264"
             
-            # rpicam-vid 명령어 (기본 방법)
-            rpicam_cmd = [
-                "rpicam-vid",
-                "--inline",                      # 인라인 헤더
-                "--codec", "h264",              # H.264 코덱
-                "--width", "1280",              # 너비
-                "--height", "720",              # 높이
-                "--framerate", "25",            # 프레임레이트
-                "--bitrate", "2500000",         # 비트레이트 (2.5Mbps)
-                "--profile", "baseline",        # 베이스라인 프로파일
-                "--level", "3.1",               # 레벨
-                "--intra", "25",                # I-프레임 간격
-                "--output", temp_file,          # 파일로 출력
-                "--timeout", "0"                # 무한 실행
+            # 방법 1: raspivid 사용 (라즈베리파이 모듈3 카메라용)
+            raspivid_cmd = [
+                "raspivid",
+                "-t", "0",                      # 무한 실행
+                "-w", "1280",                   # 너비
+                "-h", "720",                    # 높이
+                "-fps", "25",                   # 프레임레이트
+                "-b", "2500000",                # 비트레이트 (2.5Mbps)
+                "-o", temp_file,                # 파일로 출력
+                "-n",                           # 미리보기 비활성화
+                "-g", "25",                     # GOP 크기
+                "-pf", "baseline",              # 프로파일
+                "-lev", "3.1"                  # 레벨
             ]
             
-            # libcamera-vid 명령어 (백업 방법)
-            libcamera_cmd = [
-                "libcamera-vid",
-                "--inline",                      # 인라인 헤더
-                "--codec", "h264",              # H.264 코덱
-                "--width", "1280",              # 너비
-                "--height", "720",              # 높이
-                "--framerate", "25",            # 프레임레이트
-                "--bitrate", "2500000",         # 비트레이트 (2.5Mbps)
-                "--output", temp_file,          # 파일로 출력
-                "--timeout", "0"                # 무한 실행
-            ]
-            
-            # FFmpeg 명령어 (파일을 실시간으로 읽어서 RTSP로 스트리밍)
-            ffmpeg_cmd = [
+            # 방법 2: v4l2loopback + ffmpeg 사용
+            v4l2_cmd = [
                 "ffmpeg",
-                "-re",                          # 실시간 재생
-                "-fflags", "+nobuffer",         # 버퍼링 비활성화
-                "-analyzeduration", "1000000",  # 분석 시간 (1초)
-                "-probesize", "5000000",        # 프로브 크기 (5MB)
-                "-flags", "low_delay",          # 지연 최소화
-                "-f", "h264",                   # H.264 입력
-                "-i", temp_file,                # 파일 입력
-                "-c:v", "copy",                 # 코덱 복사
-                "-f", "rtsp",                   # RTSP 출력
-                "-rtsp_transport", "tcp",       # TCP 전송
+                "-f", "v4l2",                  # v4l2 입력
+                "-i", video_device,             # 비디오 장치
+                "-video_size", "1280x720",      # 해상도
+                "-framerate", "25",             # 프레임레이트
+                "-c:v", "libx264",             # H.264 코덱
+                "-preset", "ultrafast",         # 빠른 인코딩
+                "-tune", "zerolatency",         # 지연 최소화
+                "-b:v", "2500000",             # 비트레이트
+                "-f", "h264",                  # H.264 출력
+                "-y",                          # 파일 덮어쓰기
+                temp_file
+            ]
+            
+            # 방법 3: 직접 RTSP 스트리밍 (raspivid + ffmpeg)
+            direct_rtsp_cmd = [
+                "raspivid",
+                "-t", "0",                     # 무한 실행
+                "-w", "1280",                  # 너비
+                "-h", "720",                   # 높이
+                "-fps", "25",                  # 프레임레이트
+                "-b", "2500000",               # 비트레이트
+                "-o", "-",                     # stdout으로 출력
+                "-n"                           # 미리보기 비활성화
+            ]
+            
+            ffmpeg_rtsp_cmd = [
+                "ffmpeg",
+                "-re",                         # 실시간 재생
+                "-f", "h264",                  # H.264 입력
+                "-i", "pipe:0",                # stdin에서 입력
+                "-c:v", "copy",                # 코덱 복사
+                "-f", "rtsp",                  # RTSP 출력
+                "-rtsp_transport", "tcp",      # TCP 전송
                 f"rtsp://0.0.0.0:{RTSP_PORT}/{RTSP_PATH}"
             ]
             
-
-            
-            # rpicam-vid 시작 (실패 시 libcamera-vid로 대체)
-            print("🚀 rpicam-vid로 비디오 캡처 시작...")
-            print(f"rpicam-vid 명령어: {' '.join(rpicam_cmd)}")
+            # 방법 1 시도: raspivid로 파일 생성 후 FFmpeg로 스트리밍
+            print("🚀 방법 1: raspivid로 비디오 캡처 시작...")
+            print(f"raspivid 명령어: {' '.join(raspivid_cmd)}")
             
             try:
-                self.rpicam_process = subprocess.Popen(
-                    rpicam_cmd,
+                self.video_process = subprocess.Popen(
+                    raspivid_cmd,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE
                 )
-                print("✅ rpicam-vid 시작됨")
+                print("✅ raspivid 시작됨")
+                
+                # 파일이 생성될 때까지 대기
+                print("⏳ raspivid가 파일을 생성할 때까지 대기 중...")
+                time.sleep(10)
+                
+                if os.path.exists(temp_file):
+                    file_size = os.path.getsize(temp_file)
+                    print(f"✅ 파일 생성됨: {temp_file} (크기: {file_size} bytes)")
+                    
+                    # FFmpeg로 RTSP 스트리밍
+                    ffmpeg_cmd = [
+                        "ffmpeg",
+                        "-re",                          # 실시간 재생
+                        "-fflags", "+nobuffer",         # 버퍼링 비활성화
+                        "-analyzeduration", "1000000",  # 분석 시간
+                        "-probesize", "5000000",        # 프로브 크기
+                        "-flags", "low_delay",          # 지연 최소화
+                        "-f", "h264",                   # H.264 입력
+                        "-i", temp_file,                # 파일 입력
+                        "-c:v", "copy",                 # 코덱 복사
+                        "-f", "rtsp",                   # RTSP 출력
+                        "-rtsp_transport", "tcp",       # TCP 전송
+                        f"rtsp://0.0.0.0:{RTSP_PORT}/{RTSP_PATH}"
+                    ]
+                    
+                    print("🚀 FFmpeg로 RTSP 스트리밍 시작...")
+                    print(f"FFmpeg 명령어: {' '.join(ffmpeg_cmd)}")
+                    self.rtsp_process = subprocess.Popen(
+                        ffmpeg_cmd,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE
+                    )
+                    
+                    # 프로세스 시작 확인
+                    time.sleep(3)
+                    if self.rtsp_process.poll() is None:
+                        self.is_running = True
+                        pi_ip = get_raspberry_pi_ip()
+                        print(f"✅ RTSP 스트림 시작됨: rtsp://{pi_ip}:{RTSP_PORT}/{RTSP_PATH}")
+                        
+                        if self.discord_notifier:
+                            self.discord_notifier.send_rtsp_start_notification(RTSP_PORT, RTSP_PATH)
+                        
+                        return True
+                    else:
+                        print("❌ RTSP 스트림 시작 실패")
+                        return False
+                else:
+                    print("❌ 파일 생성 실패, 방법 2 시도")
+                    raise Exception("raspivid 파일 생성 실패")
+                    
             except Exception as e:
-                print(f"⚠️ rpicam-vid 실패, libcamera-vid 시도: {e}")
-                print("🚀 libcamera-vid로 비디오 캡처 시작...")
-                print(f"libcamera-vid 명령어: {' '.join(libcamera_cmd)}")
-                self.rpicam_process = subprocess.Popen(
-                    libcamera_cmd,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE
-                )
-                print("✅ libcamera-vid 시작됨")
-            
-            # rpicam-vid가 파일을 생성할 때까지 대기
-            print("⏳ rpicam-vid가 파일을 생성할 때까지 대기 중...")
-            time.sleep(10)  # 더 긴 대기 시간
-            
-            # 파일이 생성되었는지 확인
-            if not os.path.exists(temp_file):
-                print("⚠️ 파일이 생성되지 않았습니다. 추가 대기...")
-                time.sleep(5)
-            
-            if os.path.exists(temp_file):
-                file_size = os.path.getsize(temp_file)
-                print(f"✅ 파일 생성됨: {temp_file} (크기: {file_size} bytes)")
-            else:
-                print("❌ 파일 생성 실패")
-                return False
-            
-            # FFmpeg로 RTSP 스트리밍 시작
-            print("🚀 FFmpeg로 RTSP 스트리밍 시작...")
-            print(f"FFmpeg 명령어: {' '.join(ffmpeg_cmd)}")
-            self.rtsp_process = subprocess.Popen(
-                ffmpeg_cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
-            
-            # 프로세스 시작 확인
-            time.sleep(3)
-            if self.rtsp_process.poll() is None:
-                self.is_running = True
-                pi_ip = get_raspberry_pi_ip()
-                print(f"✅ RTSP 스트림 시작됨: rtsp://{pi_ip}:{RTSP_PORT}/{RTSP_PATH}")
+                print(f"⚠️ 방법 1 실패: {e}")
+                print("🚀 방법 2: 직접 RTSP 스트리밍 시도...")
                 
-                # 디스코드 알림
-                if self.discord_notifier:
-                    self.discord_notifier.send_rtsp_start_notification(RTSP_PORT, RTSP_PATH)
-                
-                return True
-            else:
-                print("❌ RTSP 스트림 시작 실패")
-                # 오류 메시지 출력
+                # 방법 2: 직접 RTSP 스트리밍
                 try:
-                    stdout, stderr = self.rtsp_process.communicate(timeout=1)
-                    if stderr:
-                        print(f"오류 메시지: {stderr.decode('utf-8', errors='ignore')}")
-                    if stdout:
-                        print(f"출력 메시지: {stdout.decode('utf-8', errors='ignore')}")
-                except:
-                    pass
-                return False
+                    print("🚀 raspivid + ffmpeg 파이프라인 시작...")
+                    
+                    # raspivid 프로세스 시작
+                    self.video_process = subprocess.Popen(
+                        direct_rtsp_cmd,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE
+                    )
+                    
+                    # ffmpeg 프로세스 시작 (raspivid의 출력을 입력으로 받음)
+                    self.rtsp_process = subprocess.Popen(
+                        ffmpeg_rtsp_cmd,
+                        stdin=self.video_process.stdout,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE
+                    )
+                    
+                    # 프로세스 시작 확인
+                    time.sleep(5)
+                    if self.rtsp_process.poll() is None and self.video_process.poll() is None:
+                        self.is_running = True
+                        pi_ip = get_raspberry_pi_ip()
+                        print(f"✅ 직접 RTSP 스트림 시작됨: rtsp://{pi_ip}:{RTSP_PORT}/{RTSP_PATH}")
+                        
+                        if self.discord_notifier:
+                            self.discord_notifier.send_rtsp_start_notification(RTSP_PORT, RTSP_PATH)
+                        
+                        return True
+                    else:
+                        print("❌ 직접 RTSP 스트림 시작 실패")
+                        return False
+                        
+                except Exception as e2:
+                    print(f"⚠️ 방법 2도 실패: {e2}")
+                    print("❌ 모든 방법 실패")
+                    return False
                 
         except Exception as e:
             print(f"❌ RTSP 스트림 시작 실패: {e}")
@@ -194,13 +235,13 @@ class RTSPStreamer:
             except subprocess.TimeoutExpired:
                 self.rtsp_process.kill()
         
-        if hasattr(self, 'rpicam_process') and self.rpicam_process:
-            print("🛑 rpicam-vid 중지 중...")
-            self.rpicam_process.terminate()
+        if hasattr(self, 'video_process') and self.video_process:
+            print("🛑 비디오 캡처 중지 중...")
+            self.video_process.terminate()
             try:
-                self.rpicam_process.wait(timeout=5)
+                self.video_process.wait(timeout=5)
             except subprocess.TimeoutExpired:
-                self.rpicam_process.kill()
+                self.video_process.kill()
         
         # 임시 파일 정리
         try:
@@ -227,7 +268,7 @@ def signal_handler(sig, frame):
     sys.exit(0)
 
 def main():
-    print("🎥 RaspiRecordSync - RTSP 스트리밍 서버 (간단 버전)")
+    print("🎥 RaspiRecordSync - RTSP 스트리밍 서버 (라즈베리파이 모듈3 카메라용)")
     pi_ip = get_raspberry_pi_ip()
     print(f"RTSP URL: rtsp://{pi_ip}:{RTSP_PORT}/{RTSP_PATH}")
     
