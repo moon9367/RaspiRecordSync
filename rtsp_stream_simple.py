@@ -56,11 +56,8 @@ class RTSPStreamer:
                 video_device = "/dev/video0"
                 print(f"⚠️ 장치 확인 오류, 기본값 사용: {video_device}")
             
-            # rpicam-vid로 파일 생성 후 FFmpeg로 스트리밍
-            temp_file = "/tmp/rtsp_stream.h264"
-            
-            # rpicam-vid 명령어
-            rpicam_cmd = [
+            # rpicam-vid를 직접 RTSP로 스트리밍
+            rtsp_cmd = [
                 "rpicam-vid",
                 "--inline",                      # 인라인 헤더
                 "--codec", "h264",              # H.264 코덱
@@ -71,63 +68,25 @@ class RTSPStreamer:
                 "--profile", "baseline",        # 베이스라인 프로파일
                 "--level", "3.1",               # 레벨
                 "--intra", "25",                # I-프레임 간격
-                "--output", temp_file,          # 임시 파일로 출력
-                "--timeout", "0"                # 무한 실행
-            ]
-            
-            # RTSP 서버 시작 (별도 프로세스)
-            rtsp_server_cmd = [
-                "ffmpeg",
-                "-f", "lavfi",                  # lavfi 입력
-                "-i", "testsrc=duration=0:size=1280x720:rate=25",  # 테스트 소스
+                "--output", "-",                # stdout으로 출력
+                "|", "ffmpeg",                  # 파이프로 FFmpeg에 전달
+                "-f", "h264",                   # H.264 입력 포맷
+                "-i", "-",                      # stdin에서 입력
+                "-c:v", "copy",                 # 코덱 복사
                 "-f", "rtsp",                   # RTSP 출력
                 "-rtsp_transport", "tcp",       # TCP 전송
                 f"rtsp://0.0.0.0:{RTSP_PORT}/{RTSP_PATH}"
             ]
             
-            # FFmpeg 명령어 (파일에서 읽어서 RTSP로 스트리밍)
-            ffmpeg_cmd = [
-                "ffmpeg",
-                "-re",                          # 실시간 재생
-                "-f", "h264",                   # H.264 입력
-                "-i", temp_file,                # 임시 파일 입력
-                "-c:v", "copy",                 # 코덱 복사
-                "-f", "rtsp",                   # RTSP 출력
-                "-rtsp_transport", "tcp",       # TCP 전송
-                f"rtsp://localhost:{RTSP_PORT}/{RTSP_PATH}"
-            ]
-            
 
             
-            # RTSP 서버 시작
-            print("🚀 RTSP 서버 시작...")
-            print(f"RTSP 서버 명령어: {' '.join(rtsp_server_cmd)}")
-            self.rtsp_server_process = subprocess.Popen(
-                rtsp_server_cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
-            
-            # RTSP 서버가 시작될 때까지 대기
-            time.sleep(3)
-            
-            # rpicam-vid 시작
-            print("🚀 rpicam-vid로 비디오 캡처 시작...")
-            print(f"rpicam-vid 명령어: {' '.join(rpicam_cmd)}")
-            self.rpicam_process = subprocess.Popen(
-                rpicam_cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
-            
-            # rpicam-vid가 파일을 생성할 때까지 대기
-            time.sleep(5)
-            
-            # FFmpeg로 RTSP 스트리밍 시작
-            print("🚀 FFmpeg로 RTSP 스트리밍 시작...")
-            print(f"FFmpeg 명령어: {' '.join(ffmpeg_cmd)}")
+            # rpicam-vid를 직접 RTSP로 스트리밍
+            print("🚀 rpicam-vid를 RTSP로 스트리밍 시작...")
+            print(f"RTSP 명령어: {' '.join(rtsp_cmd)}")
+            cmd_str = " ".join(rtsp_cmd)
             self.rtsp_process = subprocess.Popen(
-                ffmpeg_cmd,
+                cmd_str,
+                shell=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE
             )
@@ -172,30 +131,6 @@ class RTSPStreamer:
                 self.rtsp_process.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 self.rtsp_process.kill()
-        
-        if hasattr(self, 'rtsp_server_process') and self.rtsp_server_process:
-            print("🛑 RTSP 서버 중지 중...")
-            self.rtsp_server_process.terminate()
-            try:
-                self.rtsp_server_process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                self.rtsp_server_process.kill()
-        
-        if hasattr(self, 'rpicam_process') and self.rpicam_process:
-            print("🛑 rpicam-vid 중지 중...")
-            self.rpicam_process.terminate()
-            try:
-                self.rpicam_process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                self.rpicam_process.kill()
-        
-        # 임시 파일 정리
-        try:
-            if os.path.exists("/tmp/rtsp_stream.h264"):
-                os.remove("/tmp/rtsp_stream.h264")
-                print("🗑️ 임시 파일 정리됨")
-        except:
-            pass
         
         self.is_running = False
         print("✅ RTSP 스트림 중지됨")
