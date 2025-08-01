@@ -15,6 +15,9 @@ from discord_notify import DiscordNotifier
 RTSP_PORT = 8554
 RTSP_PATH = "live"
 
+# 대체 포트들
+ALTERNATIVE_PORTS = [8554, 8555, 8556, 8557, 8558]
+
 def check_port_available(port):
     """포트 사용 가능 여부 확인"""
     import socket
@@ -50,17 +53,24 @@ class RTSPServer:
         try:
             print("🚀 RTSP 서버 시작 중...")
             
-            # 포트 사용 가능 여부 확인
-            if not check_port_available(RTSP_PORT):
-                print(f"❌ 포트 {RTSP_PORT}가 이미 사용 중입니다.")
-                print("💡 다른 포트를 사용하거나 기존 프로세스를 종료하세요.")
-                return False
-            
             # 스트림 파일 존재 확인
             if not os.path.exists("/tmp/rtsp_stream.h264"):
                 print("❌ 스트림 파일이 존재하지 않습니다: /tmp/rtsp_stream.h264")
                 print("💡 먼저 카메라 스트림을 시작하세요: python3 camera_stream.py")
                 return False
+            
+            # 사용 가능한 포트 찾기
+            available_port = None
+            for port in ALTERNATIVE_PORTS:
+                if check_port_available(port):
+                    available_port = port
+                    break
+            
+            if available_port is None:
+                print("❌ 사용 가능한 포트가 없습니다.")
+                return False
+            
+            print(f"✅ 포트 {available_port} 사용")
             
             # FFmpeg RTSP 서버 명령어 (수정된 버전)
             ffmpeg_cmd = [
@@ -76,7 +86,7 @@ class RTSPServer:
                 "-probesize", "50000000",      # 프로브 크기 (50MB)
                 "-fflags", "+genpts",          # 타임스탬프 생성
                 "-avoid_negative_ts", "make_zero", # 음수 타임스탬프 방지
-                f"rtsp://0.0.0.0:{RTSP_PORT}/{RTSP_PATH}"
+                f"rtsp://0.0.0.0:{available_port}/{RTSP_PATH}"
             ]
             
             print(f"FFmpeg 명령어: {' '.join(ffmpeg_cmd)}")
@@ -95,10 +105,10 @@ class RTSPServer:
             if self.rtsp_process.poll() is None:
                 self.is_running = True
                 pi_ip = get_raspberry_pi_ip()
-                print(f"✅ RTSP 서버 시작됨: rtsp://{pi_ip}:{RTSP_PORT}/{RTSP_PATH}")
+                print(f"✅ RTSP 서버 시작됨: rtsp://{pi_ip}:{available_port}/{RTSP_PATH}")
                 
                 if self.discord_notifier:
-                    self.discord_notifier.send_rtsp_start_notification(RTSP_PORT, RTSP_PATH)
+                    self.discord_notifier.send_rtsp_start_notification(available_port, RTSP_PATH)
                 
                 return True
             else:
