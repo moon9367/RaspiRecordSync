@@ -149,6 +149,8 @@ class RTSPStreamer:
             print("=" * 50)
             
             # rpicam-vid + ffmpeg 파이프라인
+            temp_file = "/tmp/rtsp_stream.h264"
+            
             rpicam_cmd = [
                 "rpicam-vid",
                 "-t", "0",                     # 무한 실행
@@ -157,7 +159,7 @@ class RTSPStreamer:
                 "--height", "720",             # 높이
                 "--framerate", "25",           # 프레임레이트
                 "--bitrate", "2500000",        # 비트레이트
-                "--output", "stdout",          # stdout으로 출력
+                "--output", temp_file,         # 파일로 출력
                 "--inline",                    # 인라인 헤더
                 "--nopreview"                  # 미리보기 비활성화
             ]
@@ -166,7 +168,7 @@ class RTSPStreamer:
                 "ffmpeg",
                 "-re",                         # 실시간 재생
                 "-f", "h264",                  # H.264 입력
-                "-i", "pipe:0",                # stdin에서 입력
+                "-i", temp_file,               # 파일 입력
                 "-c:v", "copy",                # 코덱 복사
                 "-f", "rtsp",                  # RTSP 출력
                 "-rtsp_transport", "tcp",      # TCP 전송
