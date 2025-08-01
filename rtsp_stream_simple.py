@@ -157,8 +157,9 @@ class RTSPStreamer:
                 "--height", "720",             # 높이
                 "--framerate", "25",           # 프레임레이트
                 "--bitrate", "2500000",        # 비트레이트
-                "--output", "-",               # stdout으로 출력
-                "--inline"                     # 인라인 헤더
+                "--output", "stdout",          # stdout으로 출력
+                "--inline",                    # 인라인 헤더
+                "--nopreview"                  # 미리보기 비활성화
             ]
             
             ffmpeg_rtsp_cmd = [
@@ -170,6 +171,8 @@ class RTSPStreamer:
                 "-f", "rtsp",                  # RTSP 출력
                 "-rtsp_transport", "tcp",      # TCP 전송
                 "-listen", "1",                # RTSP 서버 모드
+                "-analyzeduration", "1000000", # 분석 시간 (1초)
+                "-probesize", "10000000",      # 프로브 크기 (10MB)
                 f"rtsp://0.0.0.0:{RTSP_PORT}/{RTSP_PATH}"
             ]
             
