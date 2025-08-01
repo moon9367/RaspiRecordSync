@@ -226,12 +226,7 @@ def process_video(h264_file):
         print(f"❌ 비디오 처리 오류: {e}")
         return False
 
-def upload_log_periodically():
-    """60초마다 로그 파일을 WebDAV로 전송"""
-    while not stop_upload_thread:
-        if os.path.exists(log_file):
-            upload_queue.put(log_file)
-        time.sleep(60)
+
 
 def test_webdav_connection():
     """WebDAV 연결 테스트"""
@@ -282,9 +277,7 @@ def main():
     
     start_upload_worker(discord_notifier)
     
-    # 로그 파일 주기적 전송 스레드 시작
-    log_thread = threading.Thread(target=upload_log_periodically, daemon=True)
-    log_thread.start()
+
     
     processed_files = set()
     try:

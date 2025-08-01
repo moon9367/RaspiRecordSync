@@ -6,12 +6,15 @@ import psutil
 import signal
 import sys
 import csv
+import threading
 from discord_notify import DiscordNotifier
 
 # 사용자 설정
 video_duration_ms = 30*60000      # 촬영 시간 (밀리초) - 30분씩 끊어서 저장
 output_dir = "recordings"     # 저장 디렉토리
 log_file = "record_log.csv"   # 로그 파일명
+system_log_file = "system_log.csv"  # 시스템 로그 파일명
+system_monitor_interval = 60  # 시스템 모니터링 간격 (초)
 
 # 디스코드 웹훅 URL 설정
 # 1. 디스코드 채널에서 설정 → 연동 → 웹훅 생성 553
@@ -113,16 +116,65 @@ def log_to_csv(filename, timestamp, cpu_percent, cpu_temp):
             writer.writerow(header)
         writer.writerow([filename, timestamp, f"{cpu_percent:.1f}", f"{cpu_temp:.1f}"])
 
+def log_system_info_to_csv(timestamp, cpu_percent, cpu_temp):
+    """1분마다 시스템 정보를 CSV에 기록"""
+    header = ["timestamp", "cpu_percent", "cpu_temp"]
+    file_exists = os.path.isfile(system_log_file)
+    with open(system_log_file, "a", newline="") as csvfile:
+        writer = csv.writer(csvfile)
+        if not file_exists:
+            writer.writerow(header)
+        writer.writerow([timestamp, f"{cpu_percent:.1f}", f"{cpu_temp:.1f}"])
+
+def system_monitor_thread():
+    """1분마다 시스템 정보를 수집하는 스레드"""
+    print(f"📊 시스템 모니터링 시작 (간격: {system_monitor_interval}초)")
+    while True:
+        try:
+            timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            cpu_percent, cpu_temp = get_cpu_info()
+            log_system_info_to_csv(timestamp, cpu_percent, cpu_temp)
+            print(f"📊 시스템 정보 기록: {timestamp}, CPU: {cpu_percent:.1f}%, 온도: {cpu_temp:.1f}°C")
+            time.sleep(system_monitor_interval)
+        except Exception as e:
+            print(f"❌ 시스템 모니터링 오류: {e}")
+            time.sleep(system_monitor_interval)
+
+def read_system_log_data():
+    """시스템 로그 파일에서 최근 데이터 읽기"""
+    if not os.path.exists(system_log_file):
+        return []
+    
+    try:
+        with open(system_log_file, 'r', newline='') as csvfile:
+            reader = csv.DictReader(csvfile)
+            return list(reader)
+    except Exception as e:
+        print(f"❌ 시스템 로그 읽기 오류: {e}")
+        return []
+
+def clear_system_log_data():
+    """시스템 로그 파일 초기화"""
+    try:
+        with open(system_log_file, 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(["timestamp", "cpu_percent", "cpu_temp"])
+        print("📝 시스템 로그 파일 초기화됨")
+    except Exception as e:
+        print(f"❌ 시스템 로그 초기화 오류: {e}")
+
 def signal_handler(sig, frame):
     print("\n🛑 종료 신호 수신")
     sys.exit(0)
 
 def main():
-    print("🎬 RaspiRecordSync - 영상 저장 및 CSV 로그 기록")
+    print("🎬 RaspiRecordSync - 영상 저장 및 시스템 모니터링")
     print(f"촬영 시간: {video_duration_ms//1000}초씩 연속 저장")
     print(f"📁 저장 위치: {output_dir}")
-    print(f"📝 로그 파일: {log_file}")
-    print(f"📊 CPU 정보 기록: {video_duration_ms//1000}초마다")
+    print(f"📝 영상 로그 파일: {log_file}")
+    print(f"📊 시스템 로그 파일: {system_log_file}")
+    print(f"📊 시스템 모니터링: {system_monitor_interval}초마다")
+    print(f"📤 시스템 로그 전송: {video_duration_ms//1000}초마다")
     
     # 디스코드 알림 초기화
     discord_notifier = None
@@ -140,6 +192,11 @@ def main():
     signal.signal(signal.SIGTERM, signal_handler)
     os.makedirs(output_dir, exist_ok=True)
     
+    # 시스템 모니터링 스레드 시작
+    system_thread = threading.Thread(target=system_monitor_thread, daemon=True)
+    system_thread.start()
+    print("✅ 시스템 모니터링 스레드 시작됨")
+    
     try:
         while True:
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -155,8 +212,15 @@ def main():
                 log_to_csv(h264_file, timestamp, cpu_percent, cpu_temp)
                 print(f"📝 로그 기록 완료: {h264_file}, {timestamp}, {cpu_percent:.1f}%, {cpu_temp:.1f}°C")
                 
-                # 디스코드 알림 전송
+                # 시스템 로그 요약 전송
                 if discord_notifier:
+                    system_log_data = read_system_log_data()
+                    if system_log_data:
+                        discord_notifier.send_system_log_summary(system_log_data, 30)
+                        clear_system_log_data()  # 로그 파일 초기화
+                        print("📤 시스템 로그 요약 전송 완료")
+                    
+                    # 영상 촬영 완료 알림
                     discord_notifier.send_recording_complete(
                         os.path.basename(h264_file), 
                         timestamp, 

@@ -358,3 +358,45 @@ class DiscordNotifier:
             "timestamp": datetime.datetime.now().isoformat()
         }
         return self.send_message("🛑 RTSP 스트림 종료됨", embed)
+    
+    def send_system_log_summary(self, log_data, period_minutes=30):
+        """시스템 로그 요약 전송"""
+        if not log_data:
+            return False
+            
+        # 통계 계산
+        cpu_percentages = [float(row['cpu_percent']) for row in log_data]
+        cpu_temps = [float(row['cpu_temp']) for row in log_data]
+        
+        avg_cpu = sum(cpu_percentages) / len(cpu_percentages)
+        max_cpu = max(cpu_percentages)
+        min_cpu = min(cpu_percentages)
+        
+        avg_temp = sum(cpu_temps) / len(cpu_temps)
+        max_temp = max(cpu_temps)
+        min_temp = min(cpu_temps)
+        
+        embed = {
+            "title": "📊 시스템 모니터링 리포트",
+            "description": f"지난 {period_minutes}분간의 시스템 상태 요약",
+            "color": 0x0099ff,  # 파란색
+            "timestamp": datetime.datetime.now().isoformat(),
+            "fields": [
+                {
+                    "name": "📈 CPU 사용률",
+                    "value": f"평균: {avg_cpu:.1f}%\n최대: {max_cpu:.1f}%\n최소: {min_cpu:.1f}%",
+                    "inline": True
+                },
+                {
+                    "name": "🌡️ CPU 온도",
+                    "value": f"평균: {avg_temp:.1f}°C\n최대: {max_temp:.1f}°C\n최소: {min_temp:.1f}°C",
+                    "inline": True
+                },
+                {
+                    "name": "📊 데이터 포인트",
+                    "value": f"{len(log_data)}개",
+                    "inline": True
+                }
+            ]
+        }
+        return self.send_message("📊 시스템 모니터링 리포트", embed)
