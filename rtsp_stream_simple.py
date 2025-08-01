@@ -38,29 +38,7 @@ class RTSPStreamer:
         try:
             print(f"🎥 RTSP 스트림 시작: {RTSP_URL}")
             
-            # 방법 1: rpicam-vid를 직접 RTSP로 스트리밍 (수정된 버전)
-            rtsp_cmd = [
-                "rpicam-vid",
-                "--inline",                      # 인라인 헤더
-                "--codec", "h264",              # H.264 코덱
-                "--width", "1280",              # 너비
-                "--height", "720",              # 높이
-                "--framerate", "25",            # 프레임레이트
-                "--bitrate", "2500000",         # 비트레이트 (2.5Mbps)
-                "--profile", "baseline",        # 베이스라인 프로파일
-                "--level", "3.1",               # 레벨
-                "--intra", "25",                # I-프레임 간격
-                "--output", "-",                # stdout으로 출력
-                "|", "ffmpeg",                  # 파이프로 FFmpeg에 전달
-                "-f", "h264",                   # 입력 포맷 지정
-                "-i", "-",                      # stdin에서 입력
-                "-c:v", "copy",                 # 코덱 복사
-                "-f", "rtsp",                   # RTSP 출력
-                "-rtsp_transport", "tcp",       # TCP 전송
-                f"rtsp://0.0.0.0:{RTSP_PORT}/{RTSP_PATH}"
-            ]
-            
-            # 방법 2: FFmpeg만 사용 (백업)
+            # FFmpeg만 사용 (rpicam-vid 파이프 문제로 인해)
             ffmpeg_cmd = [
                 "ffmpeg",
                 "-f", "v4l2",                   # Video4Linux2 입력
@@ -77,6 +55,8 @@ class RTSPStreamer:
                 "-rtsp_transport", "tcp",       # TCP 전송
                 f"rtsp://0.0.0.0:{RTSP_PORT}/{RTSP_PATH}"
             ]
+            
+
             
             # FFmpeg만 사용 (rpicam-vid 파이프 문제로 인해)
             print("🚀 FFmpeg를 사용한 RTSP 스트림 시작...")
