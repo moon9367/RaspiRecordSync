@@ -27,6 +27,81 @@ def get_raspberry_pi_ip():
     except:
         return "라즈베리파이IP"
 
+def check_camera_status():
+    """카메라 상태 상세 확인"""
+    print("=" * 50)
+    print("🔍 카메라 상태 상세 확인 시작")
+    print("=" * 50)
+    
+    # 1. vcgencmd로 카메라 상태 확인
+    print("1️⃣ vcgencmd 카메라 상태 확인...")
+    try:
+        result = subprocess.run(["vcgencmd", "get_camera"], capture_output=True, text=True)
+        if result.returncode == 0:
+            print(f"✅ vcgencmd 결과: {result.stdout.strip()}")
+        else:
+            print(f"❌ vcgencmd 실패: {result.stderr.strip()}")
+    except Exception as e:
+        print(f"❌ vcgencmd 오류: {e}")
+    
+    # 2. /dev/video* 장치 확인
+    print("\n2️⃣ /dev/video* 장치 확인...")
+    try:
+        result = subprocess.run(["ls", "-la", "/dev/video*"], capture_output=True, text=True)
+        if result.returncode == 0:
+            devices = result.stdout.strip().split('\n')
+            print(f"✅ 발견된 비디오 장치:")
+            for device in devices:
+                print(f"   {device}")
+        else:
+            print(f"❌ 비디오 장치 확인 실패: {result.stderr.strip()}")
+    except Exception as e:
+        print(f"❌ 비디오 장치 확인 오류: {e}")
+    
+    # 3. raspivid 테스트
+    print("\n3️⃣ raspivid 명령어 테스트...")
+    try:
+        test_cmd = ["raspivid", "-t", "1000", "-o", "/tmp/test.h264"]
+        print(f"테스트 명령어: {' '.join(test_cmd)}")
+        
+        result = subprocess.run(test_cmd, capture_output=True, text=True, timeout=5)
+        if result.returncode == 0:
+            print("✅ raspivid 테스트 성공")
+            if os.path.exists("/tmp/test.h264"):
+                file_size = os.path.getsize("/tmp/test.h264")
+                print(f"✅ 테스트 파일 생성됨: /tmp/test.h264 (크기: {file_size} bytes)")
+                os.remove("/tmp/test.h264")  # 테스트 파일 삭제
+            else:
+                print("❌ 테스트 파일이 생성되지 않음")
+        else:
+            print(f"❌ raspivid 테스트 실패: {result.stderr.strip()}")
+    except subprocess.TimeoutExpired:
+        print("✅ raspivid 테스트 성공 (타임아웃은 정상)")
+        if os.path.exists("/tmp/test.h264"):
+            file_size = os.path.getsize("/tmp/test.h264")
+            print(f"✅ 테스트 파일 생성됨: /tmp/test.h264 (크기: {file_size} bytes)")
+            os.remove("/tmp/test.h264")  # 테스트 파일 삭제
+    except Exception as e:
+        print(f"❌ raspivid 테스트 오류: {e}")
+    
+    # 4. ffmpeg 테스트
+    print("\n4️⃣ ffmpeg 테스트...")
+    try:
+        result = subprocess.run(["ffmpeg", "-version"], capture_output=True, text=True)
+        if result.returncode == 0:
+            print("✅ ffmpeg 설치됨")
+            # 첫 번째 줄만 출력
+            version_line = result.stdout.split('\n')[0]
+            print(f"   {version_line}")
+        else:
+            print(f"❌ ffmpeg 확인 실패: {result.stderr.strip()}")
+    except Exception as e:
+        print(f"❌ ffmpeg 확인 오류: {e}")
+    
+    print("=" * 50)
+    print("🔍 카메라 상태 확인 완료")
+    print("=" * 50)
+
 class RTSPStreamer:
     def __init__(self, discord_notifier=None):
         self.discord_notifier = discord_notifier
@@ -39,8 +114,11 @@ class RTSPStreamer:
         try:
             print(f"🎥 RTSP 스트림 시작: {RTSP_URL}")
             
+            # 카메라 상태 상세 확인
+            check_camera_status()
+            
             # 사용 가능한 비디오 장치 확인
-            print("🔍 사용 가능한 비디오 장치 확인 중...")
+            print("\n🔍 사용 가능한 비디오 장치 확인 중...")
             try:
                 result = subprocess.run(["ls", "/dev/video*"], capture_output=True, text=True)
                 if result.returncode == 0:
@@ -115,24 +193,34 @@ class RTSPStreamer:
             ]
             
             # 방법 1 시도: raspivid로 파일 생성 후 FFmpeg로 스트리밍
+            print("\n" + "=" * 50)
             print("🚀 방법 1: raspivid로 비디오 캡처 시작...")
+            print("=" * 50)
             print(f"raspivid 명령어: {' '.join(raspivid_cmd)}")
             
             try:
+                print("📹 raspivid 프로세스 시작 중...")
                 self.video_process = subprocess.Popen(
                     raspivid_cmd,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE
                 )
-                print("✅ raspivid 시작됨")
+                print("✅ raspivid 프로세스 시작됨")
                 
                 # 파일이 생성될 때까지 대기
                 print("⏳ raspivid가 파일을 생성할 때까지 대기 중...")
-                time.sleep(10)
+                for i in range(15):  # 15초 대기
+                    time.sleep(1)
+                    if os.path.exists(temp_file):
+                        file_size = os.path.getsize(temp_file)
+                        print(f"✅ 파일 생성됨: {temp_file} (크기: {file_size} bytes)")
+                        break
+                    else:
+                        print(f"⏳ 대기 중... ({i+1}/15초)")
                 
                 if os.path.exists(temp_file):
                     file_size = os.path.getsize(temp_file)
-                    print(f"✅ 파일 생성됨: {temp_file} (크기: {file_size} bytes)")
+                    print(f"✅ 파일 생성 확인됨: {temp_file} (크기: {file_size} bytes)")
                     
                     # FFmpeg로 RTSP 스트리밍
                     ffmpeg_cmd = [
@@ -150,8 +238,11 @@ class RTSPStreamer:
                         f"rtsp://0.0.0.0:{RTSP_PORT}/{RTSP_PATH}"
                     ]
                     
+                    print("\n" + "=" * 50)
                     print("🚀 FFmpeg로 RTSP 스트리밍 시작...")
+                    print("=" * 50)
                     print(f"FFmpeg 명령어: {' '.join(ffmpeg_cmd)}")
+                    
                     self.rtsp_process = subprocess.Popen(
                         ffmpeg_cmd,
                         stdout=subprocess.PIPE,
@@ -159,7 +250,9 @@ class RTSPStreamer:
                     )
                     
                     # 프로세스 시작 확인
-                    time.sleep(3)
+                    print("⏳ FFmpeg 프로세스 시작 확인 중...")
+                    time.sleep(5)
+                    
                     if self.rtsp_process.poll() is None:
                         self.is_running = True
                         pi_ip = get_raspberry_pi_ip()
@@ -171,6 +264,15 @@ class RTSPStreamer:
                         return True
                     else:
                         print("❌ RTSP 스트림 시작 실패")
+                        # 오류 메시지 출력
+                        try:
+                            stdout, stderr = self.rtsp_process.communicate(timeout=1)
+                            if stderr:
+                                print(f"FFmpeg 오류 메시지: {stderr.decode('utf-8', errors='ignore')}")
+                            if stdout:
+                                print(f"FFmpeg 출력 메시지: {stdout.decode('utf-8', errors='ignore')}")
+                        except:
+                            pass
                         return False
                 else:
                     print("❌ 파일 생성 실패, 방법 2 시도")
@@ -178,30 +280,46 @@ class RTSPStreamer:
                     
             except Exception as e:
                 print(f"⚠️ 방법 1 실패: {e}")
+                print("\n" + "=" * 50)
                 print("🚀 방법 2: 직접 RTSP 스트리밍 시도...")
+                print("=" * 50)
                 
                 # 방법 2: 직접 RTSP 스트리밍
                 try:
                     print("🚀 raspivid + ffmpeg 파이프라인 시작...")
+                    print(f"raspivid 명령어: {' '.join(direct_rtsp_cmd)}")
+                    print(f"ffmpeg 명령어: {' '.join(ffmpeg_rtsp_cmd)}")
                     
                     # raspivid 프로세스 시작
+                    print("📹 raspivid 프로세스 시작 중...")
                     self.video_process = subprocess.Popen(
                         direct_rtsp_cmd,
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE
                     )
+                    print("✅ raspivid 프로세스 시작됨")
                     
                     # ffmpeg 프로세스 시작 (raspivid의 출력을 입력으로 받음)
+                    print("📺 FFmpeg 프로세스 시작 중...")
                     self.rtsp_process = subprocess.Popen(
                         ffmpeg_rtsp_cmd,
                         stdin=self.video_process.stdout,
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE
                     )
+                    print("✅ FFmpeg 프로세스 시작됨")
                     
                     # 프로세스 시작 확인
+                    print("⏳ 프로세스 상태 확인 중...")
                     time.sleep(5)
-                    if self.rtsp_process.poll() is None and self.video_process.poll() is None:
+                    
+                    raspivid_status = self.video_process.poll()
+                    ffmpeg_status = self.rtsp_process.poll()
+                    
+                    print(f"raspivid 상태: {'실행 중' if raspivid_status is None else f'종료됨 (코드: {raspivid_status})'}")
+                    print(f"ffmpeg 상태: {'실행 중' if ffmpeg_status is None else f'종료됨 (코드: {ffmpeg_status})'}")
+                    
+                    if ffmpeg_status is None and raspivid_status is None:
                         self.is_running = True
                         pi_ip = get_raspberry_pi_ip()
                         print(f"✅ 직접 RTSP 스트림 시작됨: rtsp://{pi_ip}:{RTSP_PORT}/{RTSP_PATH}")
@@ -212,6 +330,18 @@ class RTSPStreamer:
                         return True
                     else:
                         print("❌ 직접 RTSP 스트림 시작 실패")
+                        # 오류 메시지 출력
+                        try:
+                            if raspivid_status is not None:
+                                stdout, stderr = self.video_process.communicate(timeout=1)
+                                if stderr:
+                                    print(f"raspivid 오류: {stderr.decode('utf-8', errors='ignore')}")
+                            if ffmpeg_status is not None:
+                                stdout, stderr = self.rtsp_process.communicate(timeout=1)
+                                if stderr:
+                                    print(f"ffmpeg 오류: {stderr.decode('utf-8', errors='ignore')}")
+                        except:
+                            pass
                         return False
                         
                 except Exception as e2:
