@@ -78,26 +78,14 @@ class RTSPStreamer:
                 f"rtsp://0.0.0.0:{RTSP_PORT}/{RTSP_PATH}"
             ]
             
-            # rpicam-vid 사용 시도
-            try:
-                print("🚀 rpicam-vid를 사용한 RTSP 스트림 시작...")
-                cmd_str = " ".join(rtsp_cmd)
-                print(f"실행 명령어: {cmd_str}")
-                self.rtsp_process = subprocess.Popen(
-                    cmd_str,
-                    shell=True,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE
-                )
-            except Exception as e:
-                print(f"⚠️ rpicam-vid 실패, FFmpeg 사용: {e}")
-                print("🚀 FFmpeg를 사용한 RTSP 스트림 시작...")
-                print(f"FFmpeg 명령어: {' '.join(ffmpeg_cmd)}")
-                self.rtsp_process = subprocess.Popen(
-                    ffmpeg_cmd,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE
-                )
+            # FFmpeg만 사용 (rpicam-vid 파이프 문제로 인해)
+            print("🚀 FFmpeg를 사용한 RTSP 스트림 시작...")
+            print(f"FFmpeg 명령어: {' '.join(ffmpeg_cmd)}")
+            self.rtsp_process = subprocess.Popen(
+                ffmpeg_cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
             
             # 프로세스 시작 확인
             time.sleep(3)
