@@ -75,6 +75,16 @@ class RTSPStreamer:
                 "--timeout", "0"                # 무한 실행
             ]
             
+            # RTSP 서버 시작 (별도 프로세스)
+            rtsp_server_cmd = [
+                "ffmpeg",
+                "-f", "lavfi",                  # lavfi 입력
+                "-i", "testsrc=duration=0:size=1280x720:rate=25",  # 테스트 소스
+                "-f", "rtsp",                   # RTSP 출력
+                "-rtsp_transport", "tcp",       # TCP 전송
+                f"rtsp://0.0.0.0:{RTSP_PORT}/{RTSP_PATH}"
+            ]
+            
             # FFmpeg 명령어 (파일에서 읽어서 RTSP로 스트리밍)
             ffmpeg_cmd = [
                 "ffmpeg",
@@ -84,10 +94,22 @@ class RTSPStreamer:
                 "-c:v", "copy",                 # 코덱 복사
                 "-f", "rtsp",                   # RTSP 출력
                 "-rtsp_transport", "tcp",       # TCP 전송
-                f"rtsp://0.0.0.0:{RTSP_PORT}/{RTSP_PATH}"
+                f"rtsp://localhost:{RTSP_PORT}/{RTSP_PATH}"
             ]
             
 
+            
+            # RTSP 서버 시작
+            print("🚀 RTSP 서버 시작...")
+            print(f"RTSP 서버 명령어: {' '.join(rtsp_server_cmd)}")
+            self.rtsp_server_process = subprocess.Popen(
+                rtsp_server_cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+            
+            # RTSP 서버가 시작될 때까지 대기
+            time.sleep(3)
             
             # rpicam-vid 시작
             print("🚀 rpicam-vid로 비디오 캡처 시작...")
@@ -150,6 +172,14 @@ class RTSPStreamer:
                 self.rtsp_process.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 self.rtsp_process.kill()
+        
+        if hasattr(self, 'rtsp_server_process') and self.rtsp_server_process:
+            print("🛑 RTSP 서버 중지 중...")
+            self.rtsp_server_process.terminate()
+            try:
+                self.rtsp_server_process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                self.rtsp_server_process.kill()
         
         if hasattr(self, 'rpicam_process') and self.rpicam_process:
             print("🛑 rpicam-vid 중지 중...")
