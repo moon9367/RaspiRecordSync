@@ -52,7 +52,7 @@ class RTSPStreamer:
                 "--intra", "25",                # I-프레임 간격
                 "--output", "-",                # stdout으로 출력
                 "|", "ffmpeg",                  # 파이프로 FFmpeg에 전달
-                "-re",                          # 실시간 입력
+                "-f", "h264",                   # 입력 포맷 지정
                 "-i", "-",                      # stdin에서 입력
                 "-c:v", "copy",                 # 코덱 복사
                 "-f", "rtsp",                   # RTSP 출력
