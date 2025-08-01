@@ -59,7 +59,7 @@ class RTSPStreamer:
             # rpicam-vid를 파일로 출력
             temp_file = "/tmp/rtsp_stream.h264"
             
-            # rpicam-vid 명령어
+            # rpicam-vid 명령어 (기본 방법)
             rpicam_cmd = [
                 "rpicam-vid",
                 "--inline",                      # 인라인 헤더
@@ -75,10 +75,27 @@ class RTSPStreamer:
                 "--timeout", "0"                # 무한 실행
             ]
             
+            # libcamera-vid 명령어 (백업 방법)
+            libcamera_cmd = [
+                "libcamera-vid",
+                "--inline",                      # 인라인 헤더
+                "--codec", "h264",              # H.264 코덱
+                "--width", "1280",              # 너비
+                "--height", "720",              # 높이
+                "--framerate", "25",            # 프레임레이트
+                "--bitrate", "2500000",         # 비트레이트 (2.5Mbps)
+                "--output", temp_file,          # 파일로 출력
+                "--timeout", "0"                # 무한 실행
+            ]
+            
             # FFmpeg 명령어 (파일을 실시간으로 읽어서 RTSP로 스트리밍)
             ffmpeg_cmd = [
                 "ffmpeg",
                 "-re",                          # 실시간 재생
+                "-fflags", "+nobuffer",         # 버퍼링 비활성화
+                "-analyzeduration", "1000000",  # 분석 시간 (1초)
+                "-probesize", "5000000",        # 프로브 크기 (5MB)
+                "-flags", "low_delay",          # 지연 최소화
                 "-f", "h264",                   # H.264 입력
                 "-i", temp_file,                # 파일 입력
                 "-c:v", "copy",                 # 코덱 복사
@@ -89,17 +106,43 @@ class RTSPStreamer:
             
 
             
-            # rpicam-vid 시작
+            # rpicam-vid 시작 (실패 시 libcamera-vid로 대체)
             print("🚀 rpicam-vid로 비디오 캡처 시작...")
             print(f"rpicam-vid 명령어: {' '.join(rpicam_cmd)}")
-            self.rpicam_process = subprocess.Popen(
-                rpicam_cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
+            
+            try:
+                self.rpicam_process = subprocess.Popen(
+                    rpicam_cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE
+                )
+                print("✅ rpicam-vid 시작됨")
+            except Exception as e:
+                print(f"⚠️ rpicam-vid 실패, libcamera-vid 시도: {e}")
+                print("🚀 libcamera-vid로 비디오 캡처 시작...")
+                print(f"libcamera-vid 명령어: {' '.join(libcamera_cmd)}")
+                self.rpicam_process = subprocess.Popen(
+                    libcamera_cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE
+                )
+                print("✅ libcamera-vid 시작됨")
             
             # rpicam-vid가 파일을 생성할 때까지 대기
-            time.sleep(5)
+            print("⏳ rpicam-vid가 파일을 생성할 때까지 대기 중...")
+            time.sleep(10)  # 더 긴 대기 시간
+            
+            # 파일이 생성되었는지 확인
+            if not os.path.exists(temp_file):
+                print("⚠️ 파일이 생성되지 않았습니다. 추가 대기...")
+                time.sleep(5)
+            
+            if os.path.exists(temp_file):
+                file_size = os.path.getsize(temp_file)
+                print(f"✅ 파일 생성됨: {temp_file} (크기: {file_size} bytes)")
+            else:
+                print("❌ 파일 생성 실패")
+                return False
             
             # FFmpeg로 RTSP 스트리밍 시작
             print("🚀 FFmpeg로 RTSP 스트리밍 시작...")
