@@ -7,19 +7,20 @@ import threading
 import queue
 import glob
 import urllib3
+import subprocess
 from discord_notify import DiscordNotifier
 
 # SSL 경고 비활성화
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # 사용자 설정
-input_dir = "/home/tspol/recordings"      # 입력 디렉토리
+input_dir = "recordings"      # 입력 디렉토리 (상대 경로로 변경)
 webdav_url = "http://tspol.iptime.org:5009"  # WebDAV URL (HTTP 사용)
 webdav_user = "mms9989"                 # WebDAV 사용자명
 webdav_password = "Wjswkwjs1!"         # WebDAV 패스워드
 webdav_path = "/cam/"                   # WebDAV 경로 (간단한 경로)
 check_interval = 5  # 파일 체크 간격 (초)
-log_file = "/home/tspol/record_log.csv"
+log_file = "record_log.csv"  # 로그 파일 (상대 경로로 변경)
 
 # 디스코드 웹훅 URL
 DISCORD_WEBHOOK_URL = "https://discordapp.com/api/webhooks/1398962742618095667/IVnyN4mNDHGHZxkJ_8b4N-IhIkM95kihJf25ZpXEEHqohY3GC9rOeB4BPyZVnUzXKv_T"
