@@ -82,6 +82,7 @@ class RTSPStreamer:
             try:
                 print("🚀 rpicam-vid를 사용한 RTSP 스트림 시작...")
                 cmd_str = " ".join(rtsp_cmd)
+                print(f"실행 명령어: {cmd_str}")
                 self.rtsp_process = subprocess.Popen(
                     cmd_str,
                     shell=True,
@@ -91,6 +92,7 @@ class RTSPStreamer:
             except Exception as e:
                 print(f"⚠️ rpicam-vid 실패, FFmpeg 사용: {e}")
                 print("🚀 FFmpeg를 사용한 RTSP 스트림 시작...")
+                print(f"FFmpeg 명령어: {' '.join(ffmpeg_cmd)}")
                 self.rtsp_process = subprocess.Popen(
                     ffmpeg_cmd,
                     stdout=subprocess.PIPE,
@@ -111,6 +113,15 @@ class RTSPStreamer:
                 return True
             else:
                 print("❌ RTSP 스트림 시작 실패")
+                # 오류 메시지 출력
+                try:
+                    stdout, stderr = self.rtsp_process.communicate(timeout=1)
+                    if stderr:
+                        print(f"오류 메시지: {stderr.decode('utf-8', errors='ignore')}")
+                    if stdout:
+                        print(f"출력 메시지: {stdout.decode('utf-8', errors='ignore')}")
+                except:
+                    pass
                 return False
                 
         except Exception as e:
