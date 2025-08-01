@@ -8,11 +8,22 @@ import time
 import signal
 import sys
 import socket
+import os
 from discord_notify import DiscordNotifier
 
 # RTSP 설정
 RTSP_PORT = 8554
 RTSP_PATH = "live"
+
+def check_port_available(port):
+    """포트 사용 가능 여부 확인"""
+    import socket
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind(('0.0.0.0', port))
+            return True
+    except OSError:
+        return False
 
 # 디스코드 웹훅 URL
 DISCORD_WEBHOOK_URL = "https://discordapp.com/api/webhooks/1398962742618095667/IVnyN4mNDHGHZxkJ_8b4N-IhIkM95kihJf25ZpXEEHqohY3GC9rOeB4BPyZVnUzXKv_T"
@@ -39,7 +50,19 @@ class RTSPServer:
         try:
             print("🚀 RTSP 서버 시작 중...")
             
-            # FFmpeg RTSP 서버 명령어
+            # 포트 사용 가능 여부 확인
+            if not check_port_available(RTSP_PORT):
+                print(f"❌ 포트 {RTSP_PORT}가 이미 사용 중입니다.")
+                print("💡 다른 포트를 사용하거나 기존 프로세스를 종료하세요.")
+                return False
+            
+            # 스트림 파일 존재 확인
+            if not os.path.exists("/tmp/rtsp_stream.h264"):
+                print("❌ 스트림 파일이 존재하지 않습니다: /tmp/rtsp_stream.h264")
+                print("💡 먼저 카메라 스트림을 시작하세요: python3 camera_stream.py")
+                return False
+            
+            # FFmpeg RTSP 서버 명령어 (수정된 버전)
             ffmpeg_cmd = [
                 "ffmpeg",
                 "-re",                         # 실시간 재생
@@ -49,8 +72,10 @@ class RTSPServer:
                 "-f", "rtsp",                  # RTSP 출력
                 "-rtsp_transport", "tcp",      # TCP 전송
                 "-listen", "1",                # RTSP 서버 모드
-                "-analyzeduration", "1000000", # 분석 시간 (1초)
-                "-probesize", "10000000",      # 프로브 크기 (10MB)
+                "-analyzeduration", "5000000", # 분석 시간 (5초)
+                "-probesize", "50000000",      # 프로브 크기 (50MB)
+                "-fflags", "+genpts",          # 타임스탬프 생성
+                "-avoid_negative_ts", "make_zero", # 음수 타임스탬프 방지
                 f"rtsp://0.0.0.0:{RTSP_PORT}/{RTSP_PATH}"
             ]
             
