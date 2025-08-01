@@ -40,7 +40,7 @@ class DiscordNotifier:
             "fields": [
                 {
                     "name": "📹 녹화 설정",
-                    "value": "1시간마다 영상 촬영",
+                    "value": "30분마다 영상 촬영",
                     "inline": True
                 },
                 {
@@ -315,4 +315,46 @@ class DiscordNotifier:
                 }
             ]
         }
-        return self.send_message("🚀 WebDAV 동기화 시스템 시작됨", embed) 
+        return self.send_message("🚀 WebDAV 동기화 시스템 시작됨", embed)
+    
+    def send_rtsp_start_notification(self, rtsp_port, rtsp_path):
+        """RTSP 스트림 시작 알림"""
+        embed = {
+            "title": "🎥 RTSP 스트림 시작",
+            "description": "RTSP 실시간 스트리밍이 시작되었습니다.",
+            "color": 0x00ff00,  # 초록색
+            "timestamp": datetime.datetime.now().isoformat(),
+            "fields": [
+                {
+                    "name": "📺 RTSP URL",
+                    "value": f"rtsp://[라즈베리파이IP]:{rtsp_port}/{rtsp_path}",
+                    "inline": False
+                },
+                {
+                    "name": "🔌 포트",
+                    "value": str(rtsp_port),
+                    "inline": True
+                },
+                {
+                    "name": "📡 프로토콜",
+                    "value": "RTSP/TCP",
+                    "inline": True
+                },
+                {
+                    "name": "🎬 해상도",
+                    "value": "1280x720",
+                    "inline": True
+                }
+            ]
+        }
+        return self.send_message("🎥 RTSP 스트림 시작됨", embed)
+    
+    def send_rtsp_stop_notification(self):
+        """RTSP 스트림 종료 알림"""
+        embed = {
+            "title": "🛑 RTSP 스트림 종료",
+            "description": "RTSP 실시간 스트리밍이 종료되었습니다.",
+            "color": 0xff9900,  # 주황색
+            "timestamp": datetime.datetime.now().isoformat()
+        }
+        return self.send_message("🛑 RTSP 스트림 종료됨", embed)
