@@ -9,7 +9,7 @@ import csv
 from discord_notify import DiscordNotifier
 
 # 사용자 설정
-video_duration_ms = 1*60000      # 촬영 시간 (밀리초) - 1분씩 끊어서 저장 (테스트용)
+video_duration_ms = 60*60000      # 촬영 시간 (밀리초) - 1분씩 끊어서 저장 (테스트용)
 output_dir = "recordings"     # 저장 디렉토리
 log_file = "record_log.csv"   # 로그 파일명
 
